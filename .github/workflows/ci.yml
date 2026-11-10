@@ -1,0 +1,34 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rojo, StyLua, Lune
+        uses: CompeyDev/setup-rokit@v0.1.2
+      - name: Format check
+        run: stylua --check src tests
+      - name: Build
+        run: |
+          rojo build build/shared.project.json -o build/Shared.rbxm
+          rojo build build/server.project.json -o build/Server.rbxm
+          rojo build build/client.project.json -o build/Client.rbxm
+          rojo build build/test_place.project.json -o build/Skebobs_test_place.rbxl
+      - name: Tests
+        run: |
+          lune run tests/run.luau
+          lune run tests/prices.luau
+          lune run tests/server_smoke.luau build/Skebobs_test_place.rbxl
+          lune run tests/ui_smoke.luau build/Skebobs_test_place.rbxl
+      - name: Upload build
+        uses: actions/upload-artifact@v4
+        with:
+          name: skebobs-build
+          path: |
+            build/*.rbxm
+            build/*.rbxl

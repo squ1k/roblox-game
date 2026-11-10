@@ -1,0 +1,10 @@
+# Studio / Rojo
+*.rbxl.lock
+*.rbxlx.lock
+.rojo/
+sourcemap.json
+# OS / editors
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
