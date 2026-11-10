@@ -22,12 +22,8 @@ replace(place:GetService("ReplicatedStorage"), "Shared.rbxm")
 replace(place:GetService("ServerScriptService"), "Server.rbxm")
 replace(place:GetService("StarterPlayer"):FindFirstChild("StarterPlayerScripts"), "Client.rbxm")
 
--- Служебная папка строится MapService заново при запуске
-local runtime = place:GetService("Workspace"):FindFirstChild("Skebobs_Runtime")
-if runtime then
-	print("Workspace.Skebobs_Runtime removed:", #runtime:GetDescendants(), "descendants")
-	runtime:Destroy()
-end
+-- Workspace.Skebobs_Runtime оставляем как есть: MapService переиспользует уже расставленные
+-- объекты (лавка, обмен, пьедесталы), а недостающие достраивает сам.
 
 fs.writeFile(outPath, roblox.serializePlace(place))
 print("written", outPath)
