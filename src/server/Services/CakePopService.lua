@@ -1,6 +1,6 @@
 -- Кейк-попс как физический предмет: появляется в лотке автомата, его поднимают (ProximityPrompt),
--- несут в правой руке, бросают (DropPop) и кладут в свой Холодильник. Чужой попс можно забрать только
--- в Пшеничном поле; хозяином становится тот, кто положил попс в свой Холодильник. Таяние: MeltInHandsSeconds в руках,
+-- несут в правой руке, бросают (DropPop) и кладут в свой Холодильник. Любой попс можно подобрать
+-- где угодно; хозяином становится тот, кто положил попс в свой Холодильник. Таяние: MeltInHandsSeconds в руках,
 -- MeltOnGroundSeconds на земле (время копится, сброс/подъем его не обнуляет).
 
 local Players = game:GetService("Players")
@@ -362,10 +362,8 @@ function CakePopService.TryPickUp(player: Player, entry)
 		Remotes.Notify:FireClient(player, Strings.PopSticky)
 		return
 	end
-	if entry.OwnerUserId ~= player.UserId and player:GetAttribute("Zone") ~= "Field" then
-		Remotes.Notify:FireClient(player, Strings.StealOnlyInField)
-		return
-	end
+	-- Правило из раздела "Для клода": любой попс можно подобрать где угодно,
+	-- хозяин определяется только тем, кто положил попс в свой Холодильник
 	if carried[player] or PlayerStateService.IsBusy(player) or player:GetAttribute("ClawActive") then
 		Remotes.Notify:FireClient(player, Strings.HandsBusy)
 		return
