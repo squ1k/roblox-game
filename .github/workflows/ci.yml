@@ -25,6 +25,8 @@ jobs:
           lune run tests/prices.luau
           lune run tests/server_smoke.luau build/Skebobs_test_place.rbxl
           lune run tests/ui_smoke.luau build/Skebobs_test_place.rbxl
+      - name: Assemble full place (map + code)
+        run: lune run tests/assemble_place.luau map/Skebobs_map.rbxl build build/Skebobs_full_place.rbxl
       - name: Upload build
         uses: actions/upload-artifact@v4
         with:

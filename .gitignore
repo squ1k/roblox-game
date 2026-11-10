@@ -8,3 +8,6 @@ sourcemap.json
 Thumbs.db
 .vscode/
 .idea/
+
+# Полный плейс собирается из map/ + build/ (tests/assemble_place.luau), в git не хранится
+build/Skebobs_full_place.rbxl

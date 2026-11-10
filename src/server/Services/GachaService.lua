@@ -1,9 +1,11 @@
 -- Содержимое автомата: физические капсулы (Кейк-попсы), ресток раз в RestockSeconds,
--- дыра для выигрыша и выдача попса победителю (редкость + Pity, Семейство случайно).
+-- четыре дыры для выигрыша (по одной на пульт, над шахтой своего лотка Delivery_X)
+-- и выдача попса победителю (редкость + Pity, Семейство случайно).
 -- Модель художника в режиме редактирования не меняется: все переделки только при запуске.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local TweenService = game:GetService("TweenService")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = Shared:WaitForChild("Config")
@@ -22,7 +24,7 @@ local Gacha = Balance.Gacha
 local GachaService = {}
 
 local collectedEvent = Instance.new("BindableEvent")
-GachaService.Collected = collectedEvent.Event -- (rarityId, mutationId?, familyId) капсула упала в дыру
+GachaService.Collected = collectedEvent.Event -- (rarityId, mutationId?, familyId, holeStation, lastClaw?) капсула упала в дыру
 local beforeRestockEvent = Instance.new("BindableEvent")
 GachaService.BeforeRestock = beforeRestockEvent.Event -- перед спавном новых капсул (погода решает ивент)
 local restockedEvent = Instance.new("BindableEvent")
@@ -32,7 +34,7 @@ local machine
 local capsulesFolder
 local template
 local bedCenter -- центр верха ложа
-local holeCenter
+local holes = {} -- [stationName] = { Station, Center, Direction }
 local random = Random.new()
 
 function GachaService.Machine()
@@ -43,11 +45,29 @@ function GachaService.BedCenter(): Vector3
 	return bedCenter
 end
 
-function GachaService.HoleCenter(): Vector3
-	return holeCenter
+-- Центр дыры пульта stationName (Station_East и т.д.)
+function GachaService.HoleCenter(stationName: string): Vector3?
+	local hole = holes[stationName]
+	return hole and hole.Center
 end
 
--- Оси автомата: U вдоль неподвижных рельсов, V поперек (к лотку Delivery_South)
+function GachaService.Holes()
+	return holes
+end
+
+local function nearHole(position: Vector3, clearance: number): boolean
+	for _, hole in holes do
+		if
+			(Vector3.new(position.X, 0, position.Z) - Vector3.new(hole.Center.X, 0, hole.Center.Z)).Magnitude
+			< clearance
+		then
+			return true
+		end
+	end
+	return false
+end
+
+-- Оси автомата: U вдоль неподвижных рельсов, V поперек
 function GachaService.Axes(): (Vector3, Vector3)
 	local yaw = CFrame.Angles(0, math.rad(45), 0)
 	return yaw.RightVector, -yaw.LookVector
@@ -175,8 +195,7 @@ function GachaService.Restock()
 				local angle = random:NextNumber(0, math.pi * 2)
 				local radius = math.sqrt(random:NextNumber()) * Claw.SpawnRadius
 				position = bedCenter + u * math.cos(angle) * radius + v * math.sin(angle) * radius
-			until (Vector3.new(position.X, 0, position.Z) - Vector3.new(holeCenter.X, 0, holeCenter.Z)).Magnitude
-				> Claw.SpawnHoleClearance
+			until not nearHole(position, Claw.SpawnHoleClearance)
 			local mutation = if i <= mutatedCount then mutationId else nil
 			makeCapsule(
 				rollRarity(),
@@ -225,88 +244,294 @@ function GachaService.Award(
 	EconomyService.Refresh(player)
 end
 
+local HOLE_COLOR = Color3.fromRGB(24, 30, 44) -- темный дымчатый графит
+local HOLE_TRANSPARENCY = 0.35
+
 local function buildContainer(bed: BasePart, folder: Folder)
-	local u, v = GachaService.Axes()
-	local segments = Claw.ContainerSegments
-	local radius = Claw.ContainerRadius
-	local width = 2 * math.pi * radius / segments + 0.4
-	for i = 1, segments do
-		local angle = (i / segments) * math.pi * 2
-		local direction = u * math.cos(angle) + v * math.sin(angle)
+	-- Квадратное ложе: невидимые стенки по его краям, стороны идут по осям мира
+	local half = bed.Size.Y / 2
+	for _, direction in { Vector3.xAxis, -Vector3.xAxis, Vector3.zAxis, -Vector3.zAxis } do
 		local wall = Instance.new("Part")
 		wall.Name = "ContainerWall"
 		wall.Anchored = true
 		wall.Transparency = 1
 		wall.CanQuery = false
-		wall.Size = Vector3.new(width, Claw.ContainerHeight, 1)
-		local center = bedCenter + direction * (radius + 0.5) + Vector3.new(0, Claw.ContainerHeight / 2, 0)
+		wall.Size = Vector3.new(2 * half + 2, Claw.ContainerHeight, 1)
+		local center = bedCenter + direction * (half + 0.5) + Vector3.new(0, Claw.ContainerHeight / 2, 0)
 		wall.CFrame = CFrame.lookAt(center, center + direction)
 		wall.Parent = folder
 	end
 
-	-- Дыра: квадратная труба с неоновым кантом и датчиком внутри
+	-- Дыры: квадратные трубы в углах ложа с неоновым кантом и датчиком внутри, по одной на пульт
 	local inner = Claw.HoleInner
 	local height = Claw.HoleWallHeight
-	local look = CFrame.lookAt(holeCenter, holeCenter + v)
-	for side = 0, 3 do
-		local wall = Instance.new("Part")
-		wall.Name = "HoleWall"
-		wall.Anchored = true
-		wall.Material = Enum.Material.Glass
-		wall.Transparency = 0.4
-		wall.Color = Color3.fromRGB(40, 60, 80)
-		wall.Size = Vector3.new(inner + 0.6, height, 0.3)
-		local offset = CFrame.Angles(0, side * math.pi / 2, 0) * CFrame.new(0, height / 2, -(inner / 2 + 0.15))
-		wall.CFrame = look * offset
-		wall.Parent = folder
-		local rim = Instance.new("Part")
-		rim.Name = "HoleRim"
-		rim.Anchored = true
-		rim.CanCollide = false
-		rim.CanQuery = false
-		rim.Material = Enum.Material.Neon
-		rim.Color = Color3.fromRGB(255, 210, 60)
-		rim.Size = Vector3.new(inner + 0.7, 0.2, 0.4)
-		rim.CFrame = look * CFrame.Angles(0, side * math.pi / 2, 0) * CFrame.new(0, height + 0.1, -(inner / 2 + 0.15))
-		rim.Parent = folder
+	for _, hole in holes do
+		local look = CFrame.new(hole.Center)
+		local bedBottom = bedCenter.Y - bed.Size.X
+		local seat = machine:FindFirstChild("UpperGoldSeat", true)
+		local cabinetTop = if seat then seat.Position.Y + seat.Size.Y / 2 else bedBottom - 2
+		-- в корпусе под трубой вырезан проем до потолка шахты лотка Delivery_X
+		local chute = hole.Delivery and hole.Delivery:FindFirstChild("ChuteCeiling")
+		local shaftBottom = if chute then chute.Position.Y - chute.Size.Y / 2 else cabinetTop
+		local function sidePart(
+			name: string,
+			side: number,
+			length: number,
+			y0: number,
+			y1: number,
+			thick: number,
+			offset: number
+		)
+			local p = Instance.new("Part")
+			p.Name = name
+			p.Anchored = true
+			p.CanQuery = false
+			p.CastShadow = false
+			p.Material = Enum.Material.SmoothPlastic
+			p.Size = Vector3.new(length, y1 - y0, thick)
+			p.CFrame = look
+				* CFrame.Angles(0, side * math.pi / 2, 0)
+				* CFrame.new(0, (y0 + y1) / 2 - hole.Center.Y, -offset)
+			p.Parent = folder
+			return p
+		end
+		for side = 0, 3 do
+			local even = side % 2 == 0
+			-- Стекло: одна цельная стенка от крышки корпуса до канта, сквозь вырезанный угол ложа.
+			-- Стенки не заходят друг на друга в углах, чтобы полупрозрачные грани не мерцали.
+			local wall = sidePart(
+				"HoleWall",
+				side,
+				if even then inner + 0.6 else inner,
+				cabinetTop,
+				hole.Center.Y + height,
+				0.3,
+				inner / 2 + 0.15
+			)
+			wall.Transparency = HOLE_TRANSPARENCY
+			wall.Color = HOLE_COLOR
+			-- Внутри корпуса: темная непрозрачная гильза до потолка шахты лотка, закрывает срезы корпуса
+			if cabinetTop - shaftBottom > 0.05 then
+				local liner = sidePart(
+					"HoleLiner",
+					side,
+					if even then inner + 0.6 else inner,
+					shaftBottom,
+					cabinetTop,
+					0.3,
+					inner / 2 + 0.15
+				)
+				liner.Color = Color3.fromRGB(18, 20, 28)
+			end
+			-- неоновый кант сверху
+			local rim = sidePart(
+				"HoleRim",
+				side,
+				inner + 0.7,
+				hole.Center.Y + height,
+				hole.Center.Y + height + 0.2,
+				0.4,
+				inner / 2 + 0.15
+			)
+			rim.CanCollide = false
+			rim.Material = Enum.Material.Neon
+			rim.Color = Color3.fromRGB(255, 210, 60)
+			-- золотая рамка там, где труба входит в крышку корпуса
+			local flange = sidePart(
+				"HoleFlange",
+				side,
+				if even then inner + 1.1 else inner + 0.6,
+				cabinetTop,
+				cabinetTop + 0.16,
+				0.25,
+				inner / 2 + 0.425
+			)
+			flange.Color = Color3.fromRGB(226, 190, 92)
+		end
+		-- Потолок шахты лотка: шахта лотка повернута на 45 градусов к трубе, поэтому снизу
+		-- закрываем потолок темной панелью с прямоугольным проемом по осям лотка и обводим его
+		-- золотой рамкой, чтобы рамка не упиралась в боковые стенки шахты
+		if chute then
+			local d = hole.Direction
+			local t = Vector3.yAxis:Cross(d).Unit
+			local center = Vector3.new(bedCenter.X, shaftBottom, bedCenter.Z)
+			local function radial(part: BasePart)
+				return (part.Position - center):Dot(d)
+			end
+			local back = hole.Delivery:FindFirstChild("ChuteBack")
+			local lintel = hole.Delivery:FindFirstChild("ChuteLintel")
+			local liner = hole.Delivery:FindFirstChild("ChuteLeftLiner")
+			local backFace = if back then radial(back) + back.Size.Z / 2 else Claw.HoleRadius - 1
+			local frontEdge = if lintel then radial(lintel) - lintel.Size.Z / 2 else backFace + 5
+			local halfWidth = if liner then math.abs((liner.Position - center):Dot(t)) - liner.Size.X / 2 else 2.9
+			local openFront = Claw.HoleRadius + inner / 2 + 0.25
+			local openHalf = halfWidth - 0.3
+			local frame = CFrame.fromMatrix(center, t, Vector3.yAxis, d) -- X поперек лотка, +Z наружу к лотку
+			local function plate(
+				name: string,
+				r0: number,
+				r1: number,
+				w0: number,
+				w1: number,
+				y0: number,
+				y1: number,
+				color: Color3
+			)
+				local p = Instance.new("Part")
+				p.Name = name
+				p.Anchored = true
+				p.CanCollide = false
+				p.CanQuery = false
+				p.CastShadow = false
+				p.Material = Enum.Material.SmoothPlastic
+				p.Color = color
+				p.Size = Vector3.new(w1 - w0, y1 - y0, r1 - r0)
+				p.CFrame = frame * CFrame.new((w0 + w1) / 2, (y0 + y1) / 2, (r0 + r1) / 2)
+				p.Parent = folder
+			end
+			local dark = Color3.fromRGB(18, 20, 28)
+			local gold = Color3.fromRGB(226, 190, 92)
+			-- панель потолка с проемом [backFace .. openFront] x [-openHalf .. openHalf]
+			plate("ChutePanel", openFront, frontEdge, -halfWidth, halfWidth, -0.1, 0, dark)
+			plate("ChutePanel", backFace, openFront, -halfWidth, -openHalf, -0.1, 0, dark)
+			plate("ChutePanel", backFace, openFront, openHalf, halfWidth, -0.1, 0, dark)
+			-- золотая рамка проема
+			plate("HoleThroat", openFront, openFront + 0.3, -openHalf - 0.3, openHalf + 0.3, -0.22, -0.1, gold)
+			plate("HoleThroat", backFace, openFront, -openHalf - 0.3, -openHalf, -0.22, -0.1, gold)
+			plate("HoleThroat", backFace, openFront, openHalf, openHalf + 0.3, -0.22, -0.1, gold)
+			plate("HoleThroat", backFace, backFace + 0.25, -openHalf, openHalf, -0.22, -0.1, gold)
+		end
+		local floor = Instance.new("Part")
+		floor.Name = "HoleFloor"
+		floor.Anchored = true
+		-- невидимый "ловец": капсула ложится на него, ее засекает датчик, дальше она проваливается в шахту
+		floor.Transparency = 1
+		floor.CanQuery = false
+		floor.Material = Enum.Material.SmoothPlastic
+		floor.Size = Vector3.new(inner, 0.2, inner)
+		floor.CFrame = look * CFrame.new(0, 0.1, 0)
+		floor.Parent = folder
 	end
-	local floor = Instance.new("Part")
-	floor.Name = "HoleFloor"
-	floor.Anchored = true
-	floor.Material = Enum.Material.Neon
-	floor.Color = Color3.fromRGB(20, 20, 30)
-	floor.Size = Vector3.new(inner, 0.2, inner)
-	floor.CFrame = look * CFrame.new(0, 0.1, 0)
-	floor.Parent = folder
+end
+
+-- Капсула падает по трубе сквозь проем в корпусе на пандус шахты лотка и скатывается в лоток.
+-- onArrive вызывается в лотке: там капсула исчезает, а CakePopService кладет на ее место попс.
+local function dropIntoShaft(capsule: Model, hole, onArrive: () -> ())
+	capsule:SetAttribute("Collected", true)
+	for _, part in capsule:GetDescendants() do
+		if part:IsA("BasePart") then
+			part.Anchored = true
+			part.CanCollide = false
+		end
+	end
+	local start = capsule:GetPivot()
+	local fall = CFrame.new(Vector3.new(hole.Center.X, hole.RampPoint.Y, hole.Center.Z)) * start.Rotation
+	local value = Instance.new("CFrameValue")
+	value.Value = start
+	value.Changed:Connect(function(cf)
+		if capsule.Parent then
+			capsule:PivotTo(cf)
+		end
+	end)
+	local fallTween = TweenService:Create(
+		value,
+		TweenInfo.new(0.45, Enum.EasingStyle.Quad, Enum.EasingDirection.In),
+		{ Value = fall }
+	)
+	fallTween.Completed:Connect(function()
+		-- скатывается по пандусу к лотку, прокручиваясь по ходу движения
+		local path = hole.TrayPoint - fall.Position
+		local flat = Vector3.new(path.X, 0, path.Z)
+		local axis = if flat.Magnitude > 0.01 then Vector3.yAxis:Cross(flat.Unit) else Vector3.xAxis
+		local turns = flat.Magnitude / (math.pi * Claw.CapsuleDiameter)
+		local roll = CFrame.new(hole.TrayPoint) * CFrame.fromAxisAngle(axis, -turns * 2 * math.pi) * fall.Rotation
+		local rollTween = TweenService:Create(
+			value,
+			TweenInfo.new(0.6, Enum.EasingStyle.Sine, Enum.EasingDirection.Out),
+			{ Value = roll }
+		)
+		rollTween.Completed:Connect(function()
+			value:Destroy()
+			capsule:Destroy()
+			onArrive()
+		end)
+		rollTween:Play()
+	end)
+	fallTween:Play()
+end
+
+-- Точки пути капсулы: пандус под трубой и середина лотка выдачи
+local function computeDropPath(hole)
+	local radius = Claw.CapsuleDiameter / 2
+	local exit = hole.Delivery and hole.Delivery:FindFirstChild("CapsuleExit", true)
+	local mat = hole.Delivery and hole.Delivery:FindFirstChild("TrayRubberMat", true)
+	local trayY = if mat then mat.Position.Y + mat.Size.Y / 2 else hole.Center.Y - 7
+	local tray = if exit
+		then Vector3.new(exit.WorldPosition.X, trayY + radius, exit.WorldPosition.Z)
+		else hole.Center - Vector3.new(0, 7, 0)
+	local rayParams = RaycastParams.new()
+	rayParams.FilterType = Enum.RaycastFilterType.Include
+	rayParams.FilterDescendantsInstances = { hole.Delivery }
+	local hit = hole.Delivery
+		and workspace:Raycast(
+			Vector3.new(hole.Center.X, hole.Center.Y - 5, hole.Center.Z),
+			Vector3.new(0, -10, 0),
+			rayParams
+		)
+	local ramp = if hit
+		then hit.Position + Vector3.new(0, radius, 0)
+		else Vector3.new(hole.Center.X, tray.Y + 0.6, hole.Center.Z)
+	hole.RampPoint = ramp
+	hole.TrayPoint = tray
 end
 
 local function watchHole()
+	for _, hole in holes do
+		computeDropPath(hole)
+	end
 	local params = OverlapParams.new()
 	params.FilterType = Enum.RaycastFilterType.Include
 	params.FilterDescendantsInstances = { capsulesFolder }
 	local size = Vector3.new(Claw.HoleInner - 0.2, Claw.HoleWallHeight, Claw.HoleInner - 0.2)
-	local _, v = GachaService.Axes()
-	local box = CFrame.lookAt(holeCenter, holeCenter + v) * CFrame.new(0, Claw.HoleWallHeight / 2, 0)
+	local boxes = {}
+	for _, hole in holes do
+		table.insert(boxes, {
+			Station = hole.Station,
+			Hole = hole,
+			CFrame = CFrame.new(hole.Center) * CFrame.new(0, Claw.HoleWallHeight / 2, 0),
+		})
+	end
 	while true do
 		task.wait(0.1)
 		local seen = {}
-		for _, part in workspace:GetPartBoundsInBox(box, size, params) do
-			local capsule = GachaService.CapsuleOf(part)
-			-- GetPartBoundsInBox грубый (габариты), поэтому проверяем, что центр капсулы внутри трубы
-			local inside = false
-			if capsule and capsule.PrimaryPart then
-				local localPos = box:PointToObjectSpace(capsule.PrimaryPart.Position)
-				inside = math.abs(localPos.X) < size.X / 2
-					and math.abs(localPos.Z) < size.Z / 2
-					and math.abs(localPos.Y) < size.Y / 2 + 0.5
-			end
-			if inside and not seen[capsule] and not capsule:GetAttribute("Grabbed") then
-				seen[capsule] = true
-				local rarityId = capsule:GetAttribute("Rarity")
-				local mutationId = capsule:GetAttribute("Mutation")
-				local familyId = capsule:GetAttribute("Family")
-				capsule:Destroy()
-				collectedEvent:Fire(rarityId, mutationId, familyId)
+		for _, entry in boxes do
+			local box = entry.CFrame
+			for _, part in workspace:GetPartBoundsInBox(box, size, params) do
+				local capsule = GachaService.CapsuleOf(part)
+				-- GetPartBoundsInBox грубый (габариты), поэтому проверяем, что центр капсулы внутри трубы
+				local inside = false
+				if capsule and capsule.PrimaryPart then
+					local localPos = box:PointToObjectSpace(capsule.PrimaryPart.Position)
+					inside = math.abs(localPos.X) < size.X / 2
+						and math.abs(localPos.Z) < size.Z / 2
+						and math.abs(localPos.Y) < size.Y / 2 + 0.5
+				end
+				if
+					inside
+					and not seen[capsule]
+					and not capsule:GetAttribute("Grabbed")
+					and not capsule:GetAttribute("Collected")
+				then
+					seen[capsule] = true
+					local rarityId = capsule:GetAttribute("Rarity")
+					local mutationId = capsule:GetAttribute("Mutation")
+					local familyId = capsule:GetAttribute("Family")
+					local lastClaw = capsule:GetAttribute("LastClaw")
+					-- выигрыш засчитывается, когда капсула докатилась до лотка
+					dropIntoShaft(capsule, entry.Hole, function()
+						collectedEvent:Fire(rarityId, mutationId, familyId, entry.Station, lastClaw)
+					end)
+				end
 			end
 		end
 	end
@@ -317,10 +542,25 @@ function GachaService.Start()
 	machine = field:WaitForChild("CenterZone"):WaitForChild("CapsuleClawMachine")
 	capsulesFolder = machine:WaitForChild("06_Capsules")
 	local bed = machine:WaitForChild("01_BaseAndDelivery"):WaitForChild("CapsuleBed")
-	-- Ложе: цилиндр, повернутый осью вверх, его высота = Size.X
+	-- Ложе: квадратная плита, повернутая так, что ее высота = Size.X (Y и Z = стороны квадрата)
 	bedCenter = bed.Position + Vector3.new(0, bed.Size.X / 2, 0)
-	local _, v = GachaService.Axes()
-	holeCenter = bedCenter + v * Claw.HoleOffset
+	-- Дыра каждого пульта: на краю ложа в сторону своего лотка (Station_X <-> Delivery_X)
+	holes = {}
+	for _, delivery in machine:WaitForChild("09_DeliveryStations"):GetChildren() do
+		local suffix = delivery.Name:match("^Delivery_(.+)$")
+		local exit = delivery:FindFirstChild("CapsuleExit", true)
+		if suffix and exit then
+			local flat = Vector3.new(exit.WorldPosition.X - bedCenter.X, 0, exit.WorldPosition.Z - bedCenter.Z)
+			local direction = flat.Unit
+			local station = "Station_" .. suffix
+			holes[station] = {
+				Station = station,
+				Center = bedCenter + direction * Claw.HoleRadius,
+				Direction = direction,
+				Delivery = delivery,
+			}
+		end
+	end
 
 	local first = capsulesFolder:FindFirstChildWhichIsA("Model")
 	template = first:Clone()

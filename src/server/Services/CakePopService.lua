@@ -455,7 +455,7 @@ local function setupFridges()
 			prompt.HoldDuration = 0
 			prompt.MaxActivationDistance = Pop.PromptDistance
 			prompt.RequiresLineOfSight = false
-			prompt.Enabled = false -- включается, когда владелец несет попс
+			prompt.Enabled = false
 			prompt.Parent = fridge
 			fridgePrompts[index] = prompt
 			local open = fridge:FindFirstChild("FridgeOpenPrompt") or Instance.new("ProximityPrompt")
@@ -524,8 +524,8 @@ local function tick(dt: number)
 
 	-- Замедление с попсом только в Пшеничном поле
 	for _, player in Players:GetPlayers() do
-		syncFridgePrompt(player)
 		local humanoid = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
+		syncFridgePrompt(player)
 		if humanoid and not player:GetAttribute("ClawActive") then
 			local entry = carried[player]
 			local slow = entry ~= nil

@@ -10,6 +10,7 @@ src/shared/   -> ReplicatedStorage.Shared          (конфиг, формулы
 src/server/   -> ServerScriptService.Server        (Main.server.lua + Services/*)
 src/client/   -> StarterPlayerScripts.Client       (HUD, контроллеры, UI/*)
 build/        -> project-файлы Rojo и собранные .rbxm / тестовый плейс
+map/          -> Skebobs_map.rbxl: карта и модели (снимок плейса, меняется только через Studio)
 tests/        -> Lune-тесты: формулы, цены, серверный и UI смоук
 ```
 
@@ -27,6 +28,17 @@ tests/        -> Lune-тесты: формулы, цены, серверный �
 4. Правь код в редакторе, Studio обновляется сама. В конце **Save to Roblox (Ctrl+Alt+S)**.
 
 Скрипты в Studio при подключённом Rojo править не нужно: при следующем `serve` они перезапишутся кодом из репозитория.
+
+## Полный плейс из репозитория
+
+`lune run tests/assemble_place.luau map/Skebobs_map.rbxl build build/Skebobs_full_place.rbxl`
+берёт карту из `map/`, заменяет в ней три дерева кода на собранные из `src/` и пишет готовый плейс.
+Его можно открыть в Studio (File > Open from File) и опубликовать (File > Publish to Roblox As).
+CI делает это на каждый push и прикладывает файл артефактом.
+
+Когда карта меняется в Studio: Save to File в `map/Skebobs_map.rbxl` и коммит. Если ты не владелец
+плейса и Save to File недоступен, попроси владельца или сохрани копию через Publish to Roblox As
+в свой плейс и скачай оттуда.
 
 ## Без Rojo
 

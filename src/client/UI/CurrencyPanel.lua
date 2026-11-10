@@ -84,9 +84,6 @@ local function animatedCounter(label: TextLabel)
 end
 
 return function(parent: Instance, notify, onShop)
-	local openShop = onShop or function()
-		notify(Strings.ShopSoon)
-	end
 	local panel = create("Frame", {
 		Name = "Currency",
 		BackgroundTransparency = 1,
@@ -97,6 +94,9 @@ return function(parent: Instance, notify, onShop)
 		create("UIListLayout", { Padding = UDim.new(0, 10), SortOrder = Enum.SortOrder.LayoutOrder }),
 	})
 
+	local openShop = onShop or function()
+		notify(Strings.ShopSoon)
+	end
 	local coinsLabel, incomeLabel = makeRow(panel, 1, "💰", Theme.Colors.Coin, openShop)
 	local crystalsLabel = makeRow(panel, 2, "💎", Theme.Colors.Crystal, openShop)
 
