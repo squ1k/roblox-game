@@ -11,6 +11,7 @@ local Families = require(Config:WaitForChild("Families"))
 local Strings = require(Config:WaitForChild("Strings"))
 local Remotes = require(Shared:WaitForChild("Remotes"))
 local Prices = require(Shared:WaitForChild("Prices"))
+local Capacity = require(Shared:WaitForChild("Capacity"))
 local NumberFormat = require(Shared:WaitForChild("NumberFormat"))
 
 local Theme = require(script.Parent:WaitForChild("Theme"))
@@ -112,7 +113,7 @@ return function(parent: Instance, notify)
 		if not profile then
 			return
 		end
-		setTitle(Strings.TabFridge .. " " .. #profile.Fridge .. "/" .. profile.FridgeSlots)
+		setTitle(string.format(Strings.TabFridgeCount, #profile.Fridge, Capacity.Fridge(profile, Players.LocalPlayer)))
 		local price = Prices.FridgeSlot(profile.FridgeSlots + 1)
 		expand.Text = if price
 			then string.format(Strings.FridgeExpand, NumberFormat.Short(price))

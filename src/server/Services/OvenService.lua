@@ -13,6 +13,8 @@ local Balance = require(Config:WaitForChild("Balance"))
 local Families = require(Config:WaitForChild("Families"))
 local Strings = require(Config:WaitForChild("Strings"))
 local Remotes = require(Shared:WaitForChild("Remotes"))
+local Capacity = require(Shared:WaitForChild("Capacity"))
+local Prices = require(Shared:WaitForChild("Prices"))
 local Income = require(Shared:WaitForChild("Income"))
 local NumberFormat = require(Shared:WaitForChild("NumberFormat"))
 
@@ -44,7 +46,7 @@ local function describe(petId: string, mutationId: string?): string
 	local family = skebob and Families.ById[skebob.Family]
 	local mutation = mutationId and Balance.MutationById[mutationId]
 	return (if family then family.Name .. " · " else "")
-		.. (if mutation then mutation.Name .. " " else "")
+		.. (if mutation then mutation.Name .. " · " else "")
 		.. rarity.Name
 end
 
@@ -76,7 +78,7 @@ local function changed(player: Player)
 end
 
 local function start(player: Player, data, pop): boolean
-	if #data.Ovens >= level(data).Slots then
+	if #data.Ovens >= Capacity.Oven(data, player) then
 		Remotes.Notify:FireClient(player, Strings.OvenBusy)
 		return false
 	end
@@ -112,7 +114,7 @@ local function startFromHands(player: Player)
 	if not data or not CakePopService.IsCarrying(player) then
 		return
 	end
-	if #data.Ovens >= level(data).Slots then
+	if #data.Ovens >= Capacity.Oven(data, player) then
 		Remotes.Notify:FireClient(player, Strings.OvenBusy)
 		return
 	end
@@ -189,12 +191,32 @@ function OvenService.Cancel(player: Player, slot)
 	if not entry then
 		return
 	end
-	if #data.Fridge >= data.FridgeSlots then
+	if #data.Fridge >= Capacity.Fridge(data, player) then
 		Remotes.Notify:FireClient(player, Strings.FridgeFull)
 		return
 	end
 	table.remove(data.Ovens, slot)
 	table.insert(data.Fridge, entry.Pop)
+	changed(player)
+end
+
+-- Тайм-скип: Кристаллы по Prices.TimeSkip (1 💎 = 1 R$ за каждые 5 минут остатка), попс сразу готов
+function OvenService.Skip(player: Player, slot)
+	local data = DataService.Get(player)
+	local entry = data and type(slot) == "number" and data.Ovens[slot]
+	if not entry then
+		return
+	end
+	local left = entry.StartedAt + entry.Duration - now()
+	if left <= 0 then
+		return
+	end
+	if not EconomyService.TrySpendCrystals(player, Prices.TimeSkip(left)) then
+		Remotes.Notify:FireClient(player, Strings.NoCrystals)
+		return
+	end
+	entry.Duration = now() - entry.StartedAt
+	Remotes.Notify:FireClient(player, Strings.TimeSkipDone)
 	changed(player)
 end
 
@@ -232,7 +254,7 @@ function OvenService.RefreshView(player: Player)
 	end
 	local lines = { string.format(Strings.OvenTitle, data.OvenLevel) }
 	local anyReady = false
-	for slot = 1, level(data).Slots do
+	for slot = 1, Capacity.Oven(data, player) do
 		local entry = data.Ovens[slot]
 		if entry then
 			local left = entry.StartedAt + entry.Duration - now()
@@ -248,7 +270,7 @@ function OvenService.RefreshView(player: Player)
 	end
 	view.Label.Text = table.concat(lines, "\n")
 	view.Label.Parent.Size = UDim2.fromOffset(260, 26 * #lines)
-	local canPut = CakePopService.IsCarrying(player) and #data.Ovens < level(data).Slots
+	local canPut = CakePopService.IsCarrying(player) and #data.Ovens < Capacity.Oven(data, player)
 	view.Main.Enabled = anyReady or canPut
 	view.Main.ActionText = if anyReady then Strings.OvenCollect else Strings.OvenPut
 	view.Open.Enabled = true
@@ -339,6 +361,7 @@ function OvenService.Start()
 	Remotes.OvenCollect.OnServerEvent:Connect(OvenService.Collect)
 	Remotes.OvenCancel.OnServerEvent:Connect(OvenService.Cancel)
 	Remotes.OvenUpgrade.OnServerEvent:Connect(OvenService.Upgrade)
+	Remotes.OvenSkip.OnServerEvent:Connect(OvenService.Skip)
 	DataService.ProfileLoaded:Connect(function(player)
 		local view = views[player:GetAttribute("BaseIndex")]
 		if view then

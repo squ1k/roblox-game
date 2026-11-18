@@ -90,6 +90,10 @@ local function makePlayer(userId)
 		IsFriendsWith = function()
 			return false
 		end,
+		GetAttributeChangedSignal = function()
+			return Signal()
+		end,
+		CharacterAdded = Signal(),
 		Kick = function(self, msg)
 			print("KICK", msg)
 			self.Parent = nil
@@ -106,6 +110,14 @@ local services = {
 		GetPlayers = function()
 			return playersList
 		end,
+		GetPlayerByUserId = function(_, userId)
+			for _, player in playersList do
+				if player.UserId == userId then
+					return player
+				end
+			end
+			return nil
+		end,
 	},
 	DataStoreService = {
 		GetDataStore = function()
@@ -120,7 +132,12 @@ local services = {
 			return true
 		end,
 	},
-	MarketplaceService = {},
+	MarketplaceService = {
+		PromptGamePassPurchaseFinished = Signal(),
+		UserOwnsGamePassAsync = function()
+			return false
+		end,
+	},
 	CollectionService = {
 		GetTagged = function()
 			return {}
@@ -177,6 +194,7 @@ env = {
 		end,
 	},
 	Instance = Instance,
+	Enum = roblox.Enum,
 	Color3 = roblox.Color3,
 	Vector3 = roblox.Vector3,
 	require = function(m)
@@ -197,6 +215,15 @@ local function check(cond, label)
 	end
 end
 
+-- user 4 was away 2 hours with one Common pet on a pedestal -> offline income
+storeData.u_4 = {
+	Data = {
+		Coins = 0,
+		Pets = { a = { Id = "pet_1_1", Locked = false } },
+		Pedestals = { { Level = 0, Pet = "a" } },
+		LastOnline = os.time() - 7200,
+	},
+}
 -- existing data for user 2 with an old-format profile (missing new keys)
 storeData.u_2 = { Data = { Coins = 500, Crystals = 1, Pets = {}, Pedestals = { { Level = 2, Pet = false } } } }
 -- user 3 locked by another live server
@@ -263,7 +290,6 @@ for _, n in
 		"BasketService",
 		"PatronService",
 		"WeatherService",
-		"MonetizationService",
 	}
 do
 	cache[servicesFolder[n]] = { Start = noop, Refresh = noop }
@@ -349,6 +375,32 @@ sig(remotes.AchievementClaim, "OnServerEvent"):Fire(p1, "FirstWin")
 task.wait(0.05)
 check(p1.attrs.Coins < afterClaim + 500, "achievement claimed once")
 check(snapshot.Achievements.FirstWin == "claimed", "achievement marked claimed")
+
+-- offline income: 2 h x 50% x 2 coins/s (Common) = 7200
+local p4 = makePlayer(4)
+table.insert(playersList, p4)
+playerAdded:Fire(p4)
+task.wait(0.3)
+check(p4.attrs.Coins >= 7200 and p4.attrs.Coins < 7300, "offline income 2h (got " .. tostring(p4.attrs.Coins) .. ")")
+
+-- receipts: the same PurchaseId is granted once, both calls confirm
+local Balance = env.require(RS.Shared.Config.Balance)
+for _, product in Balance.Monetization.Products do
+	if product.Key == "Crystals1" then
+		product.Id = 111
+	end
+end
+local crystalsBefore = p1.attrs.Crystals
+local receipt = { PlayerId = 1, ProductId = 111, PurchaseId = "r-1" }
+local first = services.MarketplaceService.ProcessReceipt(receipt)
+local second = services.MarketplaceService.ProcessReceipt(receipt)
+check(p1.attrs.Crystals == crystalsBefore + 500, "receipt granted once (+500)")
+check(
+	first == roblox.Enum.ProductPurchaseDecision.PurchaseGranted
+		and second == roblox.Enum.ProductPurchaseDecision.PurchaseGranted,
+	"receipt confirmed"
+)
+check(storeData.u_1.Data.Receipts["r-1"] ~= nil, "receipt saved in journal")
 
 -- leaving releases lock and saves
 local coinsAtLeave = p2.attrs.Coins

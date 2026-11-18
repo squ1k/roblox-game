@@ -116,7 +116,7 @@ local function render(player: Player)
 				cube:SetAttribute("Key", key)
 				cube.Parent = folder
 			end
-			cube.Label.Income.Text = "+" .. NumberFormat.Short(perPedestal[slot] or 0) .. Strings.PerSecondShort
+			cube.Label.Income.Text = string.format(Strings.IncomePerSecond, NumberFormat.Short(perPedestal[slot] or 0))
 		end
 	end
 	for _, child in folder:GetChildren() do

@@ -12,6 +12,7 @@ local Balance = require(Config:WaitForChild("Balance"))
 local Families = require(Config:WaitForChild("Families"))
 local Strings = require(Config:WaitForChild("Strings"))
 local Remotes = require(Shared:WaitForChild("Remotes"))
+local Capacity = require(Shared:WaitForChild("Capacity"))
 
 local DataService = require(script.Parent:WaitForChild("DataService"))
 
@@ -82,7 +83,7 @@ function BasketService.Take(player: Player, index)
 	if not data or type(index) ~= "number" or not data.Basket[index] then
 		return
 	end
-	if #data.Fridge >= data.FridgeSlots then
+	if #data.Fridge >= Capacity.Fridge(data, player) then
 		Remotes.Notify:FireClient(player, Strings.FridgeFull)
 		return
 	end

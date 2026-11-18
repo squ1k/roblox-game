@@ -117,6 +117,9 @@ for _, n in
 		"PetHatched",
 		"AchievementClaim",
 		"SettingsSet",
+		"OvenSkip",
+		"TugClick",
+		"BoomboxSet",
 	}
 do
 	local r = Instance.new("RemoteEvent")
@@ -296,7 +299,7 @@ end
 
 check(find("Currency") ~= nil, "currency panel built")
 check(find("Row1").Value.Text == "1.23K", "coins shown as 1.23K (got " .. find("Row1").Value.Text .. ")")
-check(find("Row1").PerSecond.Text == "+12/сек", "income shown")
+check(find("Row1").PerSecond.Text == "+12/s", "income shown")
 check(find("Hotbar").Slot1.Count.Text == "3/10", "banana count 3/10")
 check(find("Drop").Visible == false, "drop hidden when not carrying")
 player:SetAttribute("Carrying", true)
@@ -332,7 +335,7 @@ for _, c in content:GetChildren() do
 	end
 end
 check(cards == 2, "2 fridge cards (got " .. cards .. ")")
-check(menu.Window:FindFirstChild("Fridge", true).Text == "Холодильник 2/5", "fridge tab shows 2/5")
+check(menu.Window:FindFirstChild("Fridge", true).Text == "Fridge 2/5", "fridge tab shows 2/5")
 sig(menu.Window:FindFirstChild("Patrons", true), "Activated"):Fire()
 local rows = 0
 for _, c in content:GetChildren() do

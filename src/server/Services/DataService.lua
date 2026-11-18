@@ -64,6 +64,9 @@ local function makeTemplate()
 		TradeBlocked = {}, -- [tostring(userId)] = true, приглашения к обмену от них не приходят
 		Basket = {}, -- { { Id, Mutation, Sleeping = true } } Спящие попсы с АФК-лежака
 		BasketClearAt = 0, -- серверное время, когда корзина опустеет (0 = не идет)
+		LastOnline = 0, -- os.time() последнего сохранения, для оффлайн-дохода (0 = новый игрок)
+		Receipts = {}, -- [PurchaseId] = os.time() выдачи, журнал покупок за Robux
+		Boombox = 0, -- Audio ID бумбокса (0 = выключен)
 	}
 end
 
@@ -107,8 +110,9 @@ end
 local function save(player, release: boolean)
 	local profile = profiles[player]
 	if not profile or not profile.Persist or not store then
-		return -- профиль без сохранения (Studio без доступа к API)
+		return profile ~= nil -- профиль без сохранения (Studio без доступа к API): считаем сохраненным
 	end
+	local written = false
 	local ok, err = pcall(function()
 		store:UpdateAsync(profile.Key, function(record)
 			record = record or {}
@@ -118,14 +122,17 @@ local function save(player, release: boolean)
 				warn("[DataService] lock lost, skip save", profile.Key)
 				return nil
 			end
+			profile.Data.LastOnline = os.time()
 			record.Data = profile.Data
 			record.Lock = if release then nil else { JobId = jobId, Time = os.time() }
+			written = true
 			return record
 		end)
 	end)
 	if not ok then
 		warn("[DataService] save error", profile.Key, err)
 	end
+	return ok and written
 end
 
 local function onPlayerAdded(player: Player)
@@ -153,9 +160,7 @@ local function onPlayerAdded(player: Player)
 			if RunService:IsStudio() then
 				warn("[DataService] DataStore недоступен, играем без сохранения")
 			else
-				player:Kick(
-					"Данные еще сохраняются на другом сервере. Зайди через минуту."
-				)
+				player:Kick("Your data is still being saved on another server. Please rejoin in a minute.")
 				return
 			end
 		end
@@ -195,6 +200,11 @@ function DataService.Get(player: Player)
 end
 
 -- Ждет загрузки (для RemoteFunction, которые могут прийти раньше)
+-- Сохранить сейчас (покупки за Robux). true, если данные записаны.
+function DataService.Save(player: Player): boolean
+	return save(player, false)
+end
+
 function DataService.WaitFor(player: Player, timeout: number?)
 	local deadline = os.clock() + (timeout or 30)
 	while not profiles[player] and player.Parent and os.clock() < deadline do

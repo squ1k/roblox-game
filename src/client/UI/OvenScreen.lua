@@ -2,6 +2,7 @@
 -- в каждом попс, прогресс и таймер, "Забрать"/"Отменить". Внизу что дает следующий уровень и
 -- "Улучшить", плюс выбор попса из Холодильника для свободного окошка.
 
+local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -12,6 +13,8 @@ local Families = require(Config:WaitForChild("Families"))
 local Strings = require(Config:WaitForChild("Strings"))
 local Remotes = require(Shared:WaitForChild("Remotes"))
 local NumberFormat = require(Shared:WaitForChild("NumberFormat"))
+local Capacity = require(Shared:WaitForChild("Capacity"))
+local Prices = require(Shared:WaitForChild("Prices"))
 
 local Theme = require(script.Parent:WaitForChild("Theme"))
 local Widgets = require(script.Parent:WaitForChild("Widgets"))
@@ -95,11 +98,11 @@ return function(parent: Instance, notify)
 	local timers = {} -- { Label, Bar, Entry }
 	local render
 
-	local function windowSlot(slot: number, entry, unlocked: boolean)
+	local function windowSlot(slot: number, entry, unlocked: boolean, width: number)
 		local glass = create("Frame", {
 			LayoutOrder = slot,
 			BackgroundColor3 = if unlocked then Color3.fromRGB(30, 35, 45) else Color3.fromRGB(110, 110, 120),
-			Size = UDim2.new(0.22, 0, 0.86, 0),
+			Size = UDim2.new(width, 0, 0.86, 0),
 			ZIndex = 23,
 			Parent = body,
 		}, { Widgets.Corner(), Widgets.Stroke(3) })
@@ -178,7 +181,23 @@ return function(parent: Instance, notify)
 				Remotes.OvenCancel:FireServer(slot)
 			end
 		end)
-		table.insert(timers, { Label = timeLabel, Bar = bar, Entry = entry, Ready = ready })
+		local skip = nil
+		if not ready then
+			-- Тайм-скип за Кристаллы (1 💎 = 1 R$ за каждые 5 минут), цена обновляется вместе с таймером
+			local left = entry.StartedAt + entry.Duration - workspace:GetServerTimeNow()
+			skip = Widgets.Button({
+				Text = string.format(Strings.TimeSkip, Prices.TimeSkip(left)),
+				BackgroundColor3 = Theme.Colors.Crystal,
+				AnchorPoint = Vector2.new(0.5, 1),
+				Position = UDim2.new(0.5, 0, 1, -62),
+				Size = UDim2.new(1, -16, 0, 44),
+				ZIndex = 25,
+				Parent = glass,
+			}, function()
+				Remotes.OvenSkip:FireServer(slot)
+			end)
+		end
+		table.insert(timers, { Label = timeLabel, Bar = bar, Entry = entry, Ready = ready, Skip = skip })
 	end
 
 	local function renderPicker(profile)
@@ -214,19 +233,26 @@ return function(parent: Instance, notify)
 		end
 		local level = Oven.Levels[profile.OvenLevel] or Oven.Levels[1]
 		local nextLevel = Oven.Levels[profile.OvenLevel + 1]
+		local capacity = Capacity.Oven(profile, Players.LocalPlayer)
 		setTitle(string.format(Strings.OvenTitle, profile.OvenLevel))
 		if picking then
 			setTitle(Strings.OvenPick)
 			renderPicker(profile)
 		else
-			for slot = 1, Oven.MaxSlots do
-				windowSlot(slot, profile.Ovens[slot], slot <= level.Slots)
+			local windows = math.max(Oven.MaxSlots, capacity)
+			local width = math.min(0.22, 0.92 / windows - 0.015)
+			for slot = 1, windows do
+				windowSlot(slot, profile.Ovens[slot], slot <= capacity, width)
 			end
 		end
-		footer.Text = string.format(Strings.OvenNow, level.Slots, tostring(level.Speed))
+		footer.Text = string.format(Strings.OvenNow, capacity, tostring(level.Speed))
 			.. (
 				if nextLevel
-					then "\n" .. string.format(Strings.OvenNext, nextLevel.Slots, tostring(nextLevel.Speed))
+					then "\n" .. string.format(
+						Strings.OvenNext,
+						nextLevel.Slots * capacity // level.Slots,
+						tostring(nextLevel.Speed)
+					)
 					else ""
 			)
 		upgradeButton.Text = if nextLevel
@@ -234,7 +260,7 @@ return function(parent: Instance, notify)
 			else Strings.OvenMax
 		upgradeButton.Active = nextLevel ~= nil
 		upgradeButton.BackgroundColor3 = if nextLevel then Theme.Colors.Buy else Theme.Colors.Locked
-		local free = #profile.Ovens < level.Slots
+		local free = #profile.Ovens < capacity
 		fromFridge.Active = free
 		fromFridge.BackgroundColor3 = if free then Theme.Colors.Backpack else Theme.Colors.Locked
 	end
@@ -256,6 +282,9 @@ return function(parent: Instance, notify)
 			local left = entry.StartedAt + entry.Duration - now
 			timer.Bar.Size = UDim2.fromScale(math.clamp(1 - left / entry.Duration, 0, 1), 1)
 			timer.Label.Text = if left <= 0 then Strings.OvenReady else formatTime(left)
+			if timer.Skip then
+				timer.Skip.Text = string.format(Strings.TimeSkip, Prices.TimeSkip(math.max(0, left)))
+			end
 			if left <= 0 and not timer.Ready then
 				timer.Ready = true
 				task.defer(render) -- кнопка "Отменить" сменится на "Забрать"

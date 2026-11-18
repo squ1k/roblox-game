@@ -25,6 +25,13 @@ local Pedestals = Balance.Pedestals
 
 local PedestalService = {}
 
+local premiumRobux = 0
+for _, product in Balance.Monetization.Products do
+	if product.Key == "PremiumPedestal" then
+		premiumRobux = product.Robux
+	end
+end
+
 local prompts = {} -- [baseIndex] = { Slots = { [slot] = { Part, Main, Upgrade } }, FridgeExpand }
 
 function PedestalService.SlotOf(data, uid: string): number?
@@ -117,7 +124,12 @@ function PedestalService.BuySlot(player: Player)
 	end
 	local slot = #data.Pedestals + 1
 	local price = Prices.PedestalSlot(slot)
-	if slot > Pedestals.MaxFreeSlots or not price then
+	if slot > Pedestals.MaxFreeSlots and slot <= Pedestals.MaxSlots then
+		-- 11-й и 12-й за Robux; require здесь, потому что MonetizationService сам требует PedestalService
+		require(script.Parent:WaitForChild("MonetizationService")).PromptProduct(player, "PremiumPedestal")
+		return
+	end
+	if not price then
 		Remotes.Notify:FireClient(player, Strings.PedestalRobux)
 		return
 	end
@@ -127,6 +139,19 @@ function PedestalService.BuySlot(player: Player)
 	end
 	table.insert(data.Pedestals, { Level = 0, Pet = false })
 	changed(player)
+end
+
+-- Премиум-пьедестал (11-й, 12-й) после покупки за Robux. false, если бесплатные еще не куплены
+-- или все 12 уже есть.
+function PedestalService.AddPremiumSlot(player: Player): boolean
+	local data = DataService.Get(player)
+	local count = data and #data.Pedestals or 0
+	if not data or count < Pedestals.MaxFreeSlots or count >= Pedestals.MaxSlots then
+		return false
+	end
+	table.insert(data.Pedestals, { Level = 0, Pet = false })
+	changed(player)
+	return true
 end
 
 function PedestalService.FridgeBuySlot(player: Player)
@@ -305,6 +330,10 @@ function PedestalService.RefreshPrompts(player: Player)
 		elseif slot == #data.Pedestals + 1 and Prices.PedestalSlot(slot) and slot <= Pedestals.MaxFreeSlots then
 			view.Part:SetAttribute("State", "Buy")
 			set(view.Main, true, string.format(Strings.PedestalBuy, NumberFormat.Short(Prices.PedestalSlot(slot))), "")
+			set(view.Upgrade, false)
+		elseif slot == #data.Pedestals + 1 and slot > Pedestals.MaxFreeSlots then
+			view.Part:SetAttribute("State", "Buy")
+			set(view.Main, true, string.format(Strings.PedestalPremium, premiumRobux), "")
 			set(view.Upgrade, false)
 		else
 			view.Part:SetAttribute("State", "Locked")

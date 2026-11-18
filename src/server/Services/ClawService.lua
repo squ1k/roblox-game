@@ -5,6 +5,9 @@
 -- спуск до упора -> сжатие -> подъем (шанс удержания GrabHoldChance) -> к своей дыре -> разжатие.
 -- Ложе квадратное, своя дыра стоит в его углу над шахтой своего лотка, выигрыш появляется в лотке этого пульта.
 -- Клиент только присылает направление и "drop" через ClawInput.
+-- Конфликт: клешня сжимается на капсуле, которую только что схватила другая клешня (та еще поднимает ее).
+-- Тогда обе замирают и идет Tug-of-War на ConflictSeconds: игроки жмут TAP (TugClick), победителю
+-- попс сразу в лоток, капсула исчезает, проигравший теряет попытку (кулдаун как после игры).
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -15,9 +18,11 @@ local Config = Shared:WaitForChild("Config")
 local Balance = require(Config:WaitForChild("Balance"))
 local Strings = require(Config:WaitForChild("Strings"))
 local Remotes = require(Shared:WaitForChild("Remotes"))
+local Tug = require(Shared:WaitForChild("Tug"))
 
 local GachaService = require(script.Parent:WaitForChild("GachaService"))
 local PlayerStateService = require(script.Parent:WaitForChild("PlayerStateService"))
+local DataService = require(script.Parent:WaitForChild("DataService"))
 
 local Claw = Balance.Claw
 local Gacha = Balance.Gacha
@@ -28,6 +33,7 @@ local random = Random.new()
 local axisU, axisV
 local claws = {} -- [stationName] = claw
 local clawByPlayer = {} -- [player] = claw, пока у игрока идет сессия
+local tugs = {} -- [tug] = true: { Capsule, Claws = { holder, challenger }, Clicks = { n, n }, StartedAt, EndsAt }
 
 --[[ claw = {
 	Station, Palm, Align, Fingers = { { Motor, BaseC0, Sign, Tips } }, FingerAngle, FingerTarget,
@@ -229,23 +235,88 @@ local function grabPoint(claw): Vector3
 	return tips + Vector3.new(0, 1, 0)
 end
 
+-- Клешня, которая только что схватила капсулу и еще не ушла с ней (за нее можно бороться)
+local function contestedHolder(claw, capsule: Model)
+	local holder = claws[capsule:GetAttribute("LastClaw") or ""]
+	if
+		holder
+		and holder ~= claw
+		and holder.Grabbed
+		and holder.Grabbed.Capsule == capsule
+		and not holder.Tug
+		and (holder.State == "Closing" or holder.State == "Raising")
+		and holder.Session
+		and holder.Session.Player
+		and claw.Session
+		and claw.Session.Player
+	then
+		return holder
+	end
+	return nil
+end
+
+local function tugAttributes(tug)
+	local t = now() - tug.StartedAt
+	local scores = {}
+	for index, claw in tug.Claws do
+		local player = claw.Session and claw.Session.Player
+		scores[index] =
+			Tug.Score(tug.Clicks[index], t, player ~= nil and player:GetAttribute("Pass_AutoClicker") == true)
+	end
+	for index, claw in tug.Claws do
+		local player = claw.Session and claw.Session.Player
+		if player then
+			player:SetAttribute("TugMine", scores[index])
+			player:SetAttribute("TugTheirs", scores[3 - index])
+		end
+	end
+	return scores
+end
+
+local function startTug(holder, challenger, capsule: Model)
+	local tug = {
+		Capsule = capsule,
+		Claws = { holder, challenger },
+		Clicks = { 0, 0 },
+		StartedAt = now(),
+		EndsAt = now() + Gacha.ConflictSeconds,
+	}
+	tugs[tug] = true
+	for index, claw in tug.Claws do
+		claw.Tug = tug
+		claw.Target = claw.Palm.Position -- обе клешни замирают на месте
+		setPhase(claw, "Tug")
+		local player = claw.Session.Player
+		local other = tug.Claws[3 - index].Session.Player
+		player:SetAttribute("TugSide", if index == 1 then "Red" else "Blue")
+		player:SetAttribute("TugOpponent", other.DisplayName)
+		player:SetAttribute("TugEndsAt", tug.EndsAt)
+	end
+	tugAttributes(tug)
+end
+
 local function tryGrab(claw)
 	local params = OverlapParams.new()
 	params.FilterType = Enum.RaycastFilterType.Include
 	params.FilterDescendantsInstances = { GachaService.Machine():WaitForChild("06_Capsules") }
 	local point = grabPoint(claw)
-	local best, bestDistance = nil, math.huge
+	local best, bestDistance, bestHolder = nil, math.huge, nil
 	for _, part in workspace:GetPartBoundsInRadius(point, Claw.GrabRadius, params) do
 		local capsule = GachaService.CapsuleOf(part)
-		-- капсулу, которую уже держит другая клешня, не перехватываем
-		if capsule and capsule.PrimaryPart and not capsule:GetAttribute("Grabbed") then
+		if capsule and capsule.PrimaryPart and not capsule:GetAttribute("Collected") then
+			-- капсулу другой клешни берем, только если за нее можно побороться (Tug-of-War)
+			local holder = if capsule:GetAttribute("Grabbed") then contestedHolder(claw, capsule) else nil
 			local distance = (capsule.PrimaryPart.Position - point).Magnitude
-			if distance < bestDistance then
-				best, bestDistance = capsule, distance
+			if (holder or not capsule:GetAttribute("Grabbed")) and distance < bestDistance then
+				best, bestDistance, bestHolder = capsule, distance, holder
 			end
 		end
 	end
 	if not best then
+		return
+	end
+	if bestHolder then
+		startTug(bestHolder, claw, best)
 		return
 	end
 	best:SetAttribute("Grabbed", true)
@@ -311,6 +382,48 @@ local function endSession(claw)
 	claw.AwardUntil = os.clock() + Claw.AwardWindowSeconds
 	if claw.Prompt then
 		claw.Prompt.Enabled = true
+	end
+end
+
+local function finishTug(tug)
+	tugs[tug] = nil
+	local scores = tugAttributes(tug)
+	local players = {}
+	for index, claw in tug.Claws do
+		players[index] = claw.Session and claw.Session.Player
+	end
+	-- вышедший игрок проигрывает сразу
+	local winnerIndex = if not players[1]
+		then 2
+		elseif not players[2] then 1
+		else Tug.Winner(scores[1], scores[2], random:NextNumber())
+	local capsule = tug.Capsule
+	local rarityId = capsule:GetAttribute("Rarity")
+	local mutationId = capsule:GetAttribute("Mutation")
+	local familyId = capsule:GetAttribute("Family")
+	release(tug.Claws[1])
+	capsule:Destroy()
+	for index, claw in tug.Claws do
+		local player = players[index]
+		claw.Tug = nil
+		claw.Awarded = true -- выигрыш уже выдан здесь, дыра его не повторит
+		setFingersOpen(claw, false)
+		if player then
+			for _, key in { "TugSide", "TugOpponent", "TugEndsAt", "TugMine", "TugTheirs" } do
+				player:SetAttribute(key, nil)
+			end
+			if index == winnerIndex then
+				local data = DataService.Get(player)
+				if data then
+					data.Stats.TugWins = (data.Stats.TugWins or 0) + 1
+				end
+				GachaService.Award(player, rarityId, claw.Station, mutationId, familyId)
+				Remotes.Notify:FireClient(player, Strings.TugWon)
+			else
+				Remotes.Notify:FireClient(player, Strings.TugLost)
+			end
+		end
+		endSession(claw)
 	end
 end
 
@@ -438,7 +551,9 @@ local function step(claw, dt: number)
 	elseif state == "Closing" then
 		if os.clock() >= session.CloseAt then
 			tryGrab(claw)
-			setPhase(claw, "Raising")
+			if claw.State == "Closing" then
+				setPhase(claw, "Raising")
+			end
 		end
 	elseif state == "Raising" then
 		claw.Align.MaxVelocity = Claw.RaiseSpeed
@@ -590,9 +705,33 @@ function ClawService.Start()
 		clawByPlayer[player] = nil
 	end)
 
+	Remotes.TugClick.OnServerEvent:Connect(function(player)
+		local claw = clawByPlayer[player]
+		local tug = claw and claw.Tug
+		if not tug or now() >= tug.EndsAt then
+			return
+		end
+		local index = if tug.Claws[1] == claw then 1 else 2
+		if Tug.CanClick(tug.Clicks[index], now() - tug.StartedAt) then
+			tug.Clicks[index] += 1
+		end
+	end)
+
+	local nextTugSync = 0
 	RunService.Heartbeat:Connect(function(dt)
 		for _, claw in claws do
 			step(claw, dt)
+		end
+		local sync = os.clock() >= nextTugSync
+		if sync then
+			nextTugSync = os.clock() + 0.1 -- шкала на клиенте обновляется 10 раз в секунду
+		end
+		for tug in tugs do
+			if now() >= tug.EndsAt then
+				finishTug(tug)
+			elseif sync then
+				tugAttributes(tug)
+			end
 		end
 	end)
 end

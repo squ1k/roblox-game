@@ -210,6 +210,34 @@ function GachaService.Restock()
 	restockedEvent:Fire()
 end
 
+-- Зелье Удачи: если такой Скебобс уже есть (на пьедестале, в инвентаре, попсом в Холодильнике,
+-- шкафу или корзине), берем той же редкости из Семейства, которого у игрока еще нет. Нет таких - оставляем.
+function GachaService.LuckySkebob(data, rarity, skebob)
+	local owned = {}
+	for _, pet in data.Pets do
+		owned[pet.Id] = true
+	end
+	for _, list in { data.Fridge, data.Basket } do
+		for _, pop in list do
+			owned[pop.Id] = true
+		end
+	end
+	for _, entry in data.Ovens do
+		owned[entry.Pop.Id] = true
+	end
+	if not owned[skebob.Id] then
+		return skebob
+	end
+	local fresh = {}
+	for _, family in Families.List do
+		local member = family.Members[rarity.Order]
+		if member and not owned[member.Id] then
+			table.insert(fresh, member)
+		end
+	end
+	return if #fresh > 0 then fresh[random:NextInteger(1, #fresh)] else skebob
+end
+
 -- Попс для победителя: редкость капсулы, поднятая Pity, если пора; Семейство и мутация капсулы.
 -- Попс появляется в лотке у пульта stationName, донести до Холодильника нужно руками.
 function GachaService.Award(
@@ -238,6 +266,9 @@ function GachaService.Award(
 	end
 	local family = Families.ById[familyId or ""] or Families.List[random:NextInteger(1, #Families.List)]
 	local skebob = family.Members[rarity.Order]
+	if (player:GetAttribute("LuckUntil") or 0) > workspace:GetServerTimeNow() then
+		skebob = GachaService.LuckySkebob(data, rarity, skebob)
+	end
 	data.Stats.Grabs += 1
 	CakePopService.SpawnInTray(player, { Id = skebob.Id, Mutation = mutationId }, stationName)
 	Remotes.Notify:FireClient(player, string.format(Strings.ClawWin, rarity.Name))

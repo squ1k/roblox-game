@@ -87,6 +87,18 @@ function DevService.Start()
 				end
 				Remotes.ProfileChanged:FireClient(player)
 			end
+		elseif command == "passes" then
+			-- все геймпассы сразу, чтобы проверить эффекты без покупки (ID еще 0)
+			local MonetizationService = require(script.Parent:WaitForChild("MonetizationService"))
+			for _, pass in Balance.Monetization.GamePasses do
+				MonetizationService.GrantPass(player, pass.Key)
+			end
+		elseif command == "offline" then
+			-- как будто игрок вышел час назад: оффлайн-доход при следующем входе
+			local data = DataService.Get(player)
+			if data then
+				EconomyService.GrantOffline(player, data, os.time() + 3600)
+			end
 		elseif command == "seed" then
 			seedPets(player)
 		end

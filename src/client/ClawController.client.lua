@@ -42,7 +42,7 @@ local timerLabel = Widgets.Label({
 	TextColor3 = Theme.Colors.Coin,
 	Parent = gui,
 })
-Widgets.Label({
+local hintLabel = Widgets.Label({
 	Name = "Hint",
 	AnchorPoint = Vector2.new(0.5, 0),
 	Position = UDim2.new(0.5, 0, 0, 132),
@@ -64,6 +64,89 @@ local grabButton = Widgets.Button({
 	Remotes.ClawInput:FireServer("drop")
 end)
 grabButton.Visible = true
+
+-- Tug-of-War: большая шкала "Красный против Синего" и гигантская кнопка TAP по центру
+local tugFrame = create("Frame", {
+	Name = "Tug",
+	BackgroundTransparency = 1,
+	Size = UDim2.fromScale(1, 1),
+	Visible = false,
+	Parent = gui,
+})
+Widgets.Label({
+	AnchorPoint = Vector2.new(0.5, 0),
+	Position = UDim2.new(0.5, 0, 0, 60),
+	Size = UDim2.fromOffset(600, 56),
+	Text = Strings.TugTitle,
+	TextColor3 = Theme.Colors.Coin,
+	Parent = tugFrame,
+})
+local tugVs = Widgets.Label({
+	AnchorPoint = Vector2.new(0.5, 0),
+	Position = UDim2.new(0.5, 0, 0, 118),
+	Size = UDim2.fromOffset(600, 30),
+	MaxTextSize = 26,
+	Parent = tugFrame,
+})
+local tugTrack = create("Frame", {
+	AnchorPoint = Vector2.new(0.5, 0),
+	Position = UDim2.new(0.5, 0, 0, 156),
+	Size = UDim2.new(0.7, 0, 0, 40),
+	BackgroundColor3 = Color3.fromRGB(60, 120, 255), -- синяя сторона
+	Parent = tugFrame,
+}, { Widgets.Corner(UDim.new(1, 0)), Widgets.Stroke(4) })
+local tugRed = create("Frame", {
+	Size = UDim2.fromScale(0.5, 1),
+	BackgroundColor3 = Theme.Colors.Drop, -- красная сторона
+	Parent = tugTrack,
+}, { Widgets.Corner(UDim.new(1, 0)) })
+local tugKnot = create("Frame", {
+	AnchorPoint = Vector2.new(0.5, 0.5),
+	Position = UDim2.fromScale(0.5, 0.5),
+	Size = UDim2.fromOffset(18, 60),
+	BackgroundColor3 = Color3.new(1, 1, 1),
+	ZIndex = 2,
+	Parent = tugTrack,
+}, { Widgets.Corner(UDim.new(1, 0)), Widgets.Stroke(3) })
+local tugTimer = Widgets.Label({
+	AnchorPoint = Vector2.new(0.5, 0),
+	Position = UDim2.new(0.5, 0, 0, 204),
+	Size = UDim2.fromOffset(120, 44),
+	Parent = tugFrame,
+})
+local function tugClick()
+	Remotes.TugClick:FireServer()
+end
+Widgets.Button({
+	Name = "Tap",
+	Text = Strings.TugTap,
+	BackgroundColor3 = Theme.Colors.Coin,
+	AnchorPoint = Vector2.new(0.5, 0.5),
+	Position = UDim2.fromScale(0.5, 0.62),
+	Size = UDim2.fromOffset(240, 240),
+	CornerRadius = UDim.new(1, 0),
+	Parent = tugFrame,
+}, tugClick)
+
+local function renderTug()
+	local endsAt = player:GetAttribute("TugEndsAt")
+	tugFrame.Visible = endsAt ~= nil
+	hintLabel.Visible = endsAt == nil
+	if not endsAt then
+		return
+	end
+	local mine = player:GetAttribute("TugMine") or 0
+	local theirs = player:GetAttribute("TugTheirs") or 0
+	local red = player:GetAttribute("TugSide") == "Red"
+	local redScore = if red then mine else theirs
+	local share = if mine + theirs > 0 then redScore / (mine + theirs) else 0.5
+	tugRed.Size = UDim2.fromScale(share, 1)
+	tugKnot.Position = UDim2.fromScale(share, 0.5)
+	local me = Strings.TradeYou
+	local other = player:GetAttribute("TugOpponent") or "?"
+	tugVs.Text = if red then string.format(Strings.TugVs, me, other) else string.format(Strings.TugVs, other, me)
+	tugTimer.Text = tostring(math.max(0, math.ceil(endsAt - workspace:GetServerTimeNow())))
+end
 
 local active = false
 local lastSent = Vector2.zero
@@ -127,6 +210,7 @@ end
 local function stop()
 	active = false
 	gui.Enabled = false
+	tugFrame.Visible = false
 	for _, connection in connections do
 		connection:Disconnect()
 	end
@@ -153,6 +237,7 @@ local function start()
 			local phase = player:GetAttribute("ClawPhase")
 			local aiming = phase == "Aiming"
 			grabButton.Visible = aiming
+			renderTug()
 			local left = math.max(0, (player:GetAttribute("ClawEndsAt") or 0) - workspace:GetServerTimeNow())
 			timerLabel.Text = if aiming then tostring(math.ceil(left)) else ""
 			if aiming and humanoid then
@@ -166,6 +251,8 @@ local function start()
 		UserInputService.JumpRequest:Connect(function()
 			if player:GetAttribute("ClawPhase") == "Aiming" then
 				Remotes.ClawInput:FireServer("drop")
+			elseif player:GetAttribute("TugEndsAt") then
+				tugClick()
 			end
 		end)
 	)

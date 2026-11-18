@@ -1,7 +1,7 @@
 -- Настройки (шестеренка в HUD): громкость музыки и звуков (полоса, тап задает значение),
 -- переключатели и язык. Значения хранятся в data.Settings на сервере (SettingsSet).
 
-local UserInputService = game:GetService("UserInputService")
+local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
@@ -140,7 +140,7 @@ return function(parent: Instance, notify)
 		end
 		order += 1
 		local language = row(order, Strings.SettingsLanguage)
-		local current = setting("Language")
+		local current = Players.LocalPlayer:GetAttribute("Language") or "EN"
 		Widgets.Button({
 			Text = current,
 			BackgroundColor3 = Theme.Colors.Backpack,
@@ -150,10 +150,54 @@ return function(parent: Instance, notify)
 			ZIndex = 24,
 			Parent = language,
 		}, function()
-			-- TODO: английские тексты Strings; пока переключение только запоминается
 			Remotes.SettingsSet:FireServer("Language", if current == "RU" then "EN" else "RU")
-			notify(Strings.SettingsSoon)
 		end)
+		if Players.LocalPlayer:GetAttribute("Pass_Boombox") then
+			order += 1
+			local boombox = row(order, Strings.BoomboxTitle)
+			local current = ClientState.Profile and ClientState.Profile.Boombox or 0
+			local box = create("TextBox", {
+				Text = if current > 0 then string.format("%d", current) else "",
+				PlaceholderText = "1234567890",
+				ClearTextOnFocus = false,
+				Font = Theme.FontBody,
+				TextScaled = true,
+				TextColor3 = Theme.Colors.TextDark,
+				BackgroundColor3 = Color3.fromRGB(240, 235, 225),
+				AnchorPoint = Vector2.new(1, 0.5),
+				Position = UDim2.new(1, -244, 0.5, 0),
+				Size = UDim2.fromOffset(200, 44),
+				ZIndex = 24,
+				Parent = boombox,
+			}, { Widgets.Corner() })
+			Widgets.Button({
+				Text = Strings.BoomboxPlay,
+				BackgroundColor3 = Theme.Colors.Buy,
+				AnchorPoint = Vector2.new(1, 0.5),
+				Position = UDim2.new(1, -128, 0.5, 0),
+				Size = UDim2.fromOffset(108, 50),
+				ZIndex = 24,
+				Parent = boombox,
+			}, function()
+				local id = tonumber(box.Text:match("^%s*(%d+)%s*$"))
+				if id and id > 0 then
+					Remotes.BoomboxSet:FireServer(id)
+				else
+					notify(Strings.BoomboxBadId)
+				end
+			end)
+			Widgets.Button({
+				Text = Strings.BoomboxStop,
+				BackgroundColor3 = Theme.Colors.Drop,
+				AnchorPoint = Vector2.new(1, 0.5),
+				Position = UDim2.new(1, -12, 0.5, 0),
+				Size = UDim2.fromOffset(108, 50),
+				ZIndex = 24,
+				Parent = boombox,
+			}, function()
+				Remotes.BoomboxSet:FireServer(0)
+			end)
+		end
 		order += 1
 		local tutorial = row(order, Strings.SettingsResetTutorial)
 		Widgets.Button({

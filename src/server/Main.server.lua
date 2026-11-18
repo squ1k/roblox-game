@@ -23,6 +23,7 @@ local order = {
 	"BasketService",
 	"PatronService",
 	"MonetizationService",
+	"BoomboxService",
 	"AchievementService",
 	"SettingsService",
 	"DevService",

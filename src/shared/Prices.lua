@@ -65,6 +65,11 @@ function Prices.FridgeSlot(slot: number): number?
 	return roundPrice(fridge.SlotPriceBase * fridge.SlotPriceGrowth ^ (slot - fridge.StartSlots - 1))
 end
 
+-- Тайм-скип разморозки в Кристаллах: 1 за каждые TimeSkipSecondsPerCrystal оставшегося времени (минимум 1)
+function Prices.TimeSkip(secondsLeft: number): number
+	return math.max(1, math.ceil(secondsLeft / Balance.Monetization.TimeSkipSecondsPerCrystal))
+end
+
 -- Цена покупки пьедестала номер `slot` за Монеты (11 и 12 только за Robux)
 function Prices.PedestalSlot(slot: number): number?
 	return Balance.Pedestals.SlotPrices[slot]

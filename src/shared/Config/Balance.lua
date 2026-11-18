@@ -9,7 +9,7 @@ local Balance = {}
 Balance.Rarities = {
 	{
 		Id = "Common",
-		Name = "Обычный",
+		Name = "Common",
 		Chance = 48.81,
 		Income = 2,
 		Pity = nil,
@@ -18,7 +18,7 @@ Balance.Rarities = {
 	},
 	{
 		Id = "Uncommon",
-		Name = "Необычный",
+		Name = "Uncommon",
 		Chance = 27.87,
 		Income = 10,
 		Pity = nil,
@@ -27,7 +27,7 @@ Balance.Rarities = {
 	},
 	{
 		Id = "Rare",
-		Name = "Редкий",
+		Name = "Rare",
 		Chance = 14.40,
 		Income = 35,
 		Pity = 20,
@@ -36,7 +36,7 @@ Balance.Rarities = {
 	},
 	{
 		Id = "Epic",
-		Name = "Эпический",
+		Name = "Epic",
 		Chance = 6.07,
 		Income = 100,
 		Pity = 50,
@@ -45,7 +45,7 @@ Balance.Rarities = {
 	},
 	{
 		Id = "Legendary",
-		Name = "Легендарный",
+		Name = "Legendary",
 		Chance = 1.88,
 		Income = 250,
 		Pity = 100,
@@ -54,7 +54,7 @@ Balance.Rarities = {
 	},
 	{
 		Id = "Mythic",
-		Name = "Мифический",
+		Name = "Mythic",
 		Chance = 0.55,
 		Income = 500,
 		Pity = 300,
@@ -63,7 +63,7 @@ Balance.Rarities = {
 	},
 	{
 		Id = "Secret",
-		Name = "Секретный",
+		Name = "Secret",
 		Chance = 0.24,
 		Income = 800,
 		Pity = 500,
@@ -72,7 +72,7 @@ Balance.Rarities = {
 	},
 	{
 		Id = "Cosmic",
-		Name = "Космический",
+		Name = "Cosmic",
 		Chance = 0.12,
 		Income = 1300,
 		Pity = 700,
@@ -81,7 +81,7 @@ Balance.Rarities = {
 	},
 	{
 		Id = "Divine",
-		Name = "Божественный",
+		Name = "Divine",
 		Chance = 0.07,
 		Income = 2000,
 		Pity = 1000,
@@ -99,22 +99,22 @@ end
 -- Мутации. У пета максимум одна: либо от погоды, либо случайная при вылуплении.
 -- IncomeMult множит доход пета. Цена продажи у Антона: см. Balance.Sell (+25% за мутацию).
 Balance.HatchMutations = {
-	{ Id = "Shiny", Name = "Блестящий", Chance = 9.0, IncomeMult = 1.25 },
-	{ Id = "Prismatic", Name = "Призматический", Chance = 2.5, IncomeMult = 1.75 },
-	{ Id = "Astral", Name = "Астральный", Chance = 0.5, IncomeMult = 2.5 },
+	{ Id = "Shiny", Name = "Shiny", Chance = 9.0, IncomeMult = 1.25 },
+	{ Id = "Prismatic", Name = "Prismatic", Chance = 2.5, IncomeMult = 1.75 },
+	{ Id = "Astral", Name = "Astral", Chance = 0.5, IncomeMult = 2.5 },
 }
 
 -- Особые эффекты погодных мутаций (скорость, кристаллы, соседи и т.д.) делаются в Epic 8,
 -- здесь только множитель дохода самого пета.
 Balance.WeatherMutations = {
-	{ Id = "Melted", Name = "Расплавленный", Event = "Eruption", IncomeMult = 3.0 },
-	{ Id = "Frozen", Name = "Ледяной", Event = "CryoStorm", IncomeMult = 1.5 },
-	{ Id = "Toxic", Name = "Токсичный", Event = "ToxicFog", IncomeMult = 1.0 },
-	{ Id = "Neon", Name = "Неоновый", Event = "NeonSmog", IncomeMult = 1.0 },
-	{ Id = "Mirage", Name = "Миражный", Event = "SandMirage", IncomeMult = 1.75 },
-	{ Id = "Starlight", Name = "Звездный", Event = "Starfall", IncomeMult = 2.0 },
-	{ Id = "Stormy", Name = "Штормовой", Event = "TropicalRain", IncomeMult = 1.8 },
-	{ Id = "Bubble", Name = "Пузырьковый", Event = "Tide", IncomeMult = 2.0 },
+	{ Id = "Melted", Name = "Melted", Event = "Eruption", IncomeMult = 3.0 },
+	{ Id = "Frozen", Name = "Frozen", Event = "CryoStorm", IncomeMult = 1.5 },
+	{ Id = "Toxic", Name = "Toxic", Event = "ToxicFog", IncomeMult = 1.0 },
+	{ Id = "Neon", Name = "Neon", Event = "NeonSmog", IncomeMult = 1.0 },
+	{ Id = "Mirage", Name = "Mirage", Event = "SandMirage", IncomeMult = 1.75 },
+	{ Id = "Starlight", Name = "Starlight", Event = "Starfall", IncomeMult = 2.0 },
+	{ Id = "Stormy", Name = "Stormy", Event = "TropicalRain", IncomeMult = 1.8 },
+	{ Id = "Bubble", Name = "Bubble", Event = "Tide", IncomeMult = 2.0 },
 }
 
 Balance.MutationById = {}
@@ -287,26 +287,40 @@ Balance.Weather = {
 	ToxicMergeBonus = 0.1, -- Токсичный Скебобс на пьедестале: +10% к шансу "Риска" на Алтаре
 }
 
--- Донат (Epic 8). Id = 0: товар виден, кнопка серая "Скоро". Цены в Robux из диздока.
+-- Донат (Epic 8). ID берутся из Config/GamePasses.lua (0 = товар виден, кнопка серая "Скоро").
+-- Цены в Robux из диздока, показываются в магазине.
+local Ids = require(script.Parent:WaitForChild("GamePasses"))
 Balance.Monetization = {
 	GamePasses = {
-		{ Key = "XRay", Id = 0, Robux = 379 },
-		{ Key = "Vip", Id = 0, Robux = 1000 },
-		{ Key = "SecondOven", Id = 0, Robux = 789 },
-		{ Key = "SecondFridge", Id = 0, Robux = 779 },
-		{ Key = "AutoClicker", Id = 0, Robux = 489 },
-		{ Key = "SpeedPotion", Id = 0, Robux = 979 },
+		{ Key = "XRay", Id = Ids.Passes.XRay, Robux = 379 },
+		{ Key = "Vip", Id = Ids.Passes.Vip, Robux = 1000 },
+		{ Key = "SecondOven", Id = Ids.Passes.SecondOven, Robux = 789 },
+		{ Key = "SecondFridge", Id = Ids.Passes.SecondFridge, Robux = 779 },
+		{ Key = "AutoClicker", Id = Ids.Passes.AutoClicker, Robux = 489 },
+		{ Key = "SpeedPotion", Id = Ids.Passes.SpeedPotion, Robux = 979 },
+		{ Key = "Boombox", Id = Ids.Passes.Boombox, Robux = 350 },
 	},
 	Products = {
-		{ Key = "LuckPotion", Id = 0, Robux = 99 },
-		{ Key = "Coins1", Id = 0, Robux = 50, IncomeSeconds = 1800 }, -- TODO: сколько монет, в диздоке нет
-		{ Key = "Coins2", Id = 0, Robux = 400, IncomeSeconds = 18000 },
-		{ Key = "Coins3", Id = 0, Robux = 2500, IncomeSeconds = 150000 },
-		{ Key = "Crystals1", Id = 0, Robux = 500, Crystals = 500 }, -- 1 Кристалл = 1 R$
-		{ Key = "Crystals2", Id = 0, Robux = 4000, Crystals = 4000 },
-		{ Key = "Crystals3", Id = 0, Robux = 25000, Crystals = 25000 },
+		{ Key = "LuckPotion", Id = Ids.Products.LuckPotion, Robux = 99 },
+		{ Key = "PremiumPedestal", Id = Ids.Products.PremiumPedestal, Robux = 369 },
+		{ Key = "Coins1", Id = Ids.Products.Coins1, Robux = 50, IncomeSeconds = 1800 }, -- TODO: сколько монет, в диздоке нет
+		{ Key = "Coins2", Id = Ids.Products.Coins2, Robux = 400, IncomeSeconds = 18000 },
+		{ Key = "Coins3", Id = Ids.Products.Coins3, Robux = 2500, IncomeSeconds = 150000 },
+		{ Key = "Crystals1", Id = Ids.Products.Crystals1, Robux = 500, Crystals = 500 }, -- 1 Кристалл = 1 R$
+		{ Key = "Crystals2", Id = Ids.Products.Crystals2, Robux = 4000, Crystals = 4000 },
+		{ Key = "Crystals3", Id = Ids.Products.Crystals3, Robux = 25000, Crystals = 25000 },
 	},
 	MinCoinsPack = 1000, -- если доход еще маленький
+	ReceiptKeepDays = 7, -- журнал покупок: Roblox повторяет чек не дольше нескольких дней
+	SpeedPotionMult = 1.5, -- +50% к скорости
+	AutoClickerCps = 5, -- +5 кликов в секунду в Tug-of-War
+	-- Второй шкаф и второй Холодильник = еще один такой же объект: мест становится в 2 раза больше
+	SecondObjectMult = 2,
+	-- Тайм-скип: 1 R$ за каждые 5 минут оставшейся разморозки. Цена динамическая, а цена Developer
+	-- Product фиксирована, поэтому платим Кристаллами (1 Кристалл = 1 R$, докупаются за Robux).
+	TimeSkipSecondsPerCrystal = 300,
+	BoomboxVolume = 0.6,
+	BoomboxRange = 90, -- в студах от центра базы
 }
 
 -- Терминал Черного рынка у Лавки Антона: обмен Монет на Кристаллы и обратно (курс из диздока)
@@ -460,7 +474,7 @@ Balance.DefaultSettings = {
 	IncomePopups = true,
 	ScreenShake = true,
 	TradeBlockAll = false,
-	Language = "RU",
+	Language = "Auto", -- Auto = по языку Roblox у игрока (ru -> RU, иначе EN); в настройках RU или EN
 }
 
 -- Клиентские эффекты мира (Epic 7)

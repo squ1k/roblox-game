@@ -55,6 +55,8 @@ local function sortedPedestals(pedestalsModel: Instance)
 	return result
 end
 
+local PREMIUM_COLOR = Color3.fromRGB(255, 200, 40)
+
 local function makePart(name: string, size: Vector3, color: Color3, parent: Instance): Part
 	local part = Instance.new("Part")
 	part.Name = name
@@ -189,7 +191,9 @@ local function buildBase(index: number, model: Model, runtime: Folder, raycastPa
 					position = origin + Vector3.new(slot * 3, 0, 0)
 				end
 				local size = MapConfig.PlaceholderPedestalSize
-				local part = makePart("PlaceholderPedestal" .. slot, size, color, folder)
+				local premium = slot > Balance.Pedestals.MaxFreeSlots
+				local part =
+					makePart("PlaceholderPedestal" .. slot, size, if premium then PREMIUM_COLOR else color, folder)
 				part.Position = position + Vector3.new(0, size.Y / 2, 0)
 				anchor = part
 				table.insert(used, position)
@@ -202,6 +206,15 @@ local function buildBase(index: number, model: Model, runtime: Folder, raycastPa
 			ref.Value = anchor
 		end
 		base.Anchors[slot] = anchor
+		-- Премиум-пьедесталы 11 и 12 (за Robux) с золотой окантовкой
+		if slot > Balance.Pedestals.MaxFreeSlots and not anchor:FindFirstChild("PremiumTrim") then
+			local trim = Instance.new("Highlight")
+			trim.Name = "PremiumTrim"
+			trim.FillTransparency = 1
+			trim.OutlineColor = PREMIUM_COLOR
+			trim.DepthMode = Enum.HighlightDepthMode.Occluded
+			trim.Parent = anchor
+		end
 	end
 
 	-- Объекты базы: ставим, только если их еще нет (художник мог передвинуть)

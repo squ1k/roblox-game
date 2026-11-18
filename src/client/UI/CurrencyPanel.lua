@@ -116,7 +116,7 @@ return function(parent: Instance, notify, onShop)
 	end
 	local function onIncome()
 		local income = player:GetAttribute("Income") or 0
-		incomeLabel.Text = if income > 0 then "+" .. NumberFormat.Short(income) .. Strings.PerSecond else ""
+		incomeLabel.Text = if income > 0 then string.format(Strings.IncomePerSecond, NumberFormat.Short(income)) else ""
 	end
 	local function onCrystals(instant)
 		setCrystals(player:GetAttribute("Crystals") or 0, instant)

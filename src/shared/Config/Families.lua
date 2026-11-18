@@ -14,7 +14,7 @@ for f = 1, FAMILY_COUNT do
 	end
 	Families[f] = {
 		Id = "family_" .. f,
-		Name = "Семейство " .. f,
+		Name = "Family " .. f, -- русский перевод "Семейство N" в StringsRU.FamilyName
 		Color = Color3.fromHSV((f - 1) / FAMILY_COUNT, 0.55, 1), -- цвет Патрона-заглушки и бестиария
 		Patron = members[#members].Id,
 		Members = members,

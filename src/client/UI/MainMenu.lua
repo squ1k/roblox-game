@@ -2,6 +2,8 @@
 -- Достижения.
 -- Только крупные тапы, без drag & drop. Действия в карточках пока заглушки.
 
+local Players = game:GetService("Players")
+local MarketplaceService = game:GetService("MarketplaceService")
 local TweenService = game:GetService("TweenService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -13,6 +15,7 @@ local Strings = require(Config:WaitForChild("Strings"))
 local Income = require(Shared:WaitForChild("Income"))
 local Remotes = require(Shared:WaitForChild("Remotes"))
 local Prices = require(Shared:WaitForChild("Prices"))
+local Capacity = require(Shared:WaitForChild("Capacity"))
 local NumberFormat = require(Shared:WaitForChild("NumberFormat"))
 
 local Theme = require(script.Parent:WaitForChild("Theme"))
@@ -258,7 +261,7 @@ return function(parent: Instance, notify, screens)
 	end
 
 	local function soon()
-		notify("Появится в следующем этапе")
+		notify(Strings.ComingSoon)
 	end
 
 	local function renderSkebobs(profile)
@@ -293,7 +296,7 @@ return function(parent: Instance, notify, screens)
 				subtitle = mutation.Name .. " · " .. subtitle
 			end
 			if onPedestal[entry.Uid] then
-				subtitle ..= "\nНа пьедестале"
+				subtitle ..= "\n" .. Strings.OnPedestal
 			end
 			if entry.Pet.Locked then
 				subtitle = "🔒 " .. subtitle
@@ -423,7 +426,7 @@ return function(parent: Instance, notify, screens)
 				Parent = row,
 			})
 			Widgets.Label({
-				Text = "Босс: " .. family.Patron,
+				Text = string.format(Strings.PatronBoss, family.Patron),
 				TextColor3 = Theme.Colors.TextDark,
 				Outline = false,
 				Font = Theme.FontBody,
@@ -627,11 +630,27 @@ return function(parent: Instance, notify, screens)
 				},
 			})
 		elseif nextSlot <= Balance.Pedestals.MaxSlots then
-			row(nextOrder(), Strings.PedestalRobux, {})
+			-- 11-й и 12-й: Developer Product "PremiumPedestal", выдачу делает MonetizationService
+			local premium
+			for _, product in Balance.Monetization.Products do
+				if product.Key == "PremiumPedestal" then
+					premium = product
+				end
+			end
+			row(nextOrder(), string.format(Strings.PedestalPremium, premium.Robux), {
+				if premium.Id > 0
+					then {
+						Text = Strings.DonateBuy,
+						Color = Theme.Colors.Coin,
+						Run = function()
+							MarketplaceService:PromptProductPurchase(Players.LocalPlayer, premium.Id)
+						end,
+					}
+					else { Text = Strings.DonateSoon },
+			})
 		end
 
 		-- Тепловой шкаф
-		local level = Balance.Oven.Levels[profile.OvenLevel] or Balance.Oven.Levels[1]
 		local nextLevel = Balance.Oven.Levels[profile.OvenLevel + 1]
 		row(nextOrder(), string.format(Strings.OvenTitle, profile.OvenLevel), {
 			{
@@ -653,7 +672,7 @@ return function(parent: Instance, notify, screens)
 				}
 				else { Text = Strings.OvenMax },
 		}, true)
-		for slot = 1, level.Slots do
+		for slot = 1, Capacity.Oven(profile, Players.LocalPlayer) do
 			local entry = profile.Ovens[slot]
 			if entry then
 				local left = entry.StartedAt + entry.Duration - now
@@ -684,16 +703,21 @@ return function(parent: Instance, notify, screens)
 
 		-- Холодильник
 		local fridgePrice = Prices.FridgeSlot(profile.FridgeSlots + 1)
-		row(nextOrder(), Strings.TabFridge .. " " .. #profile.Fridge .. "/" .. profile.FridgeSlots, {
-			if fridgePrice
-				then {
-					Text = string.format(Strings.FridgeExpand, NumberFormat.Short(fridgePrice)),
-					Run = function()
-						Remotes.FridgeBuySlot:FireServer()
-					end,
-				}
-				else { Text = Strings.FridgeMax },
-		}, true)
+		row(
+			nextOrder(),
+			string.format(Strings.TabFridgeCount, #profile.Fridge, Capacity.Fridge(profile, Players.LocalPlayer)),
+			{
+				if fridgePrice
+					then {
+						Text = string.format(Strings.FridgeExpand, NumberFormat.Short(fridgePrice)),
+						Run = function()
+							Remotes.FridgeBuySlot:FireServer()
+						end,
+					}
+					else { Text = Strings.FridgeMax },
+			},
+			true
+		)
 
 		-- АФК-корзина
 		local clearText = if (profile.BasketClearAt or 0) > 0
@@ -722,7 +746,8 @@ return function(parent: Instance, notify, screens)
 			emptyText("...")
 			return
 		end
-		tabButtons.Fridge.Text = Strings.TabFridge .. " " .. #profile.Fridge .. "/" .. profile.FridgeSlots
+		tabButtons.Fridge.Text =
+			string.format(Strings.TabFridgeCount, #profile.Fridge, Capacity.Fridge(profile, Players.LocalPlayer))
 		if currentTab == "Skebobs" then
 			renderSkebobs(profile)
 		elseif currentTab == "Fridge" then

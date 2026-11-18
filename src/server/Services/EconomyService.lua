@@ -2,19 +2,21 @@
 -- Баланс показывается клиенту через атрибуты игрока Coins, Crystals, Income.
 
 local Players = game:GetService("Players")
-local MarketplaceService = game:GetService("MarketplaceService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Config = Shared:WaitForChild("Config")
 local Income = require(Shared:WaitForChild("Income"))
-local GamePasses = require(Shared:WaitForChild("Config"):WaitForChild("GamePasses"))
+local Balance = require(Config:WaitForChild("Balance"))
+local Strings = require(Config:WaitForChild("Strings"))
+local Remotes = require(Shared:WaitForChild("Remotes"))
+local NumberFormat = require(Shared:WaitForChild("NumberFormat"))
 
 local DataService = require(script.Parent:WaitForChild("DataService"))
 
 local EconomyService = {}
 
 local friendCounts = {} -- [player] = друзей на сервере
-local vipOwners = {} -- [player] = true
 
 local function publish(player: Player, data, incomePerSecond: number?)
 	player:SetAttribute("Coins", data.Coins)
@@ -27,7 +29,7 @@ end
 local function contextFor(player: Player)
 	return {
 		Afk = player:GetAttribute("AFK") == true,
-		Vip = vipOwners[player] == true or player:GetAttribute("VIP") == true, -- атрибут ставит MonetizationService
+		Vip = player:GetAttribute("VIP") == true, -- атрибут ставит MonetizationService
 		FriendsOnServer = friendCounts[player] or 0,
 	}
 end
@@ -46,15 +48,6 @@ local function recountFriends()
 		end
 		friendCounts[player] = count
 	end
-end
-
-local function checkVip(player: Player)
-	if GamePasses.VIP == 0 then
-		return
-	end
-	local ok, owns = pcall(MarketplaceService.UserOwnsGamePassAsync, MarketplaceService, player.UserId, GamePasses.VIP)
-	vipOwners[player] = ok and owns or nil
-	player:SetAttribute("VIP", vipOwners[player] == true)
 end
 
 function EconomyService.AddCoins(player: Player, amount: number)
@@ -103,6 +96,28 @@ function EconomyService.Context(player: Player)
 	return contextFor(player)
 end
 
+-- Оффлайн-доход: IncomeShare обычного дохода (без АФК и друзей) за время отсутствия,
+-- но не дольше Offline.MaxHours. Время берется из последнего сохранения (DataService пишет LastOnline).
+function EconomyService.GrantOffline(player: Player, data, nowTime: number): number
+	local last = data.LastOnline or 0
+	data.LastOnline = nowTime -- повторная загрузка не выдаст доход второй раз
+	if last <= 0 or nowTime <= last then
+		return 0
+	end
+	local seconds = math.min(nowTime - last, Balance.Offline.MaxHours * 3600)
+	local perSecond = Income.Compute(data, { Afk = false, Vip = false, FriendsOnServer = 0 })
+	local earned = math.floor(perSecond * Balance.Offline.IncomeShare * seconds)
+	if earned > 0 then
+		EconomyService.AddCoins(player, earned)
+		task.delay(3, function() -- клиент к этому времени уже слушает Notify
+			if player.Parent then
+				Remotes.Notify:FireClient(player, string.format(Strings.OfflineIncome, NumberFormat.Short(earned)))
+			end
+		end)
+	end
+	return earned
+end
+
 -- Пересчитать "в секунду" сразу (после смены пьедесталов и т.п.)
 function EconomyService.Refresh(player: Player)
 	local data = DataService.Get(player)
@@ -113,8 +128,8 @@ function EconomyService.Refresh(player: Player)
 end
 
 function EconomyService.Start()
-	DataService.ProfileLoaded:Connect(function(player)
-		checkVip(player)
+	DataService.ProfileLoaded:Connect(function(player, data)
+		EconomyService.GrantOffline(player, data, os.time())
 		EconomyService.Refresh(player)
 	end)
 	Players.PlayerAdded:Connect(function()
@@ -122,7 +137,6 @@ function EconomyService.Start()
 	end)
 	Players.PlayerRemoving:Connect(function(player)
 		friendCounts[player] = nil
-		vipOwners[player] = nil
 		task.defer(recountFriends)
 	end)
 

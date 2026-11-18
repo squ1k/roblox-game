@@ -171,6 +171,10 @@ UserInputService.InputBegan:Connect(function(input, processed)
 			Remotes.DevCommand:FireServer("family")
 		elseif input.KeyCode == Enum.KeyCode.J then
 			Remotes.DevCommand:FireServer("weather")
+		elseif input.KeyCode == Enum.KeyCode.H then
+			Remotes.DevCommand:FireServer("passes")
+		elseif input.KeyCode == Enum.KeyCode.L then
+			Remotes.DevCommand:FireServer("offline")
 		end
 	end
 end)

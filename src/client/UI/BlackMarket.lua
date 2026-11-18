@@ -73,12 +73,10 @@ return function(parent: Instance, notify)
 	local buyButton, sellButton
 	local function refresh()
 		amountLabel.Text = tostring(amount) .. " 💎"
-		buyButton.Text = string
-			.format(Strings.BlackMarketBuy, NumberFormat.Short(Market.CoinsPerCrystal * amount))
-			:gsub("→ 1", "→ " .. amount)
-		sellButton.Text = string
-			.format(Strings.BlackMarketSell, NumberFormat.Short(Market.CoinsForCrystal * amount))
-			:gsub("1 💎", amount .. " 💎")
+		buyButton.Text =
+			string.format(Strings.BlackMarketBuy, NumberFormat.Short(Market.CoinsPerCrystal * amount), amount)
+		sellButton.Text =
+			string.format(Strings.BlackMarketSell, amount, NumberFormat.Short(Market.CoinsForCrystal * amount))
 	end
 	for _, spec in { { "-", -1, 0.5, -150 }, { "+", 1, 0.5, 90 } } do
 		Widgets.Button({

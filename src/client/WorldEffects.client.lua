@@ -76,8 +76,8 @@ task.spawn(function()
 				local label = cube:FindFirstChild("Label")
 				local income = label and label:FindFirstChild("Income")
 				if cube:IsA("BasePart") and income and income.Text ~= "" then
-					-- табличка "+2.5/сек" -> всплывает "+2.5"
-					local shown = income.Text:gsub(Strings.PerSecondShort, "")
+					-- табличка "+2.5/s" (или переведенная "+2.5/сек") -> всплывает "+2.5"
+					local shown = income.Text:match("^%+[^/]+") or income.Text
 					floatText(cube, shown, Color3.fromRGB(255, 210, 60), Vector3.new(0, cube.Size.Y / 2 + 3, 0))
 				end
 			end

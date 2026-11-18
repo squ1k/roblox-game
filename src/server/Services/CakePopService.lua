@@ -12,6 +12,7 @@ local Balance = require(Config:WaitForChild("Balance"))
 local Families = require(Config:WaitForChild("Families"))
 local Strings = require(Config:WaitForChild("Strings"))
 local Remotes = require(Shared:WaitForChild("Remotes"))
+local Capacity = require(Shared:WaitForChild("Capacity"))
 
 local DataService = require(script.Parent:WaitForChild("DataService"))
 local MapService = require(script.Parent:WaitForChild("MapService"))
@@ -425,7 +426,7 @@ local function onFridgePrompt(player: Player, baseIndex: number)
 	if not data then
 		return
 	end
-	if #data.Fridge >= data.FridgeSlots then
+	if #data.Fridge >= Capacity.Fridge(data, player) then
 		Remotes.Notify:FireClient(player, Strings.FridgeFull)
 		return
 	end
@@ -437,7 +438,7 @@ local function onFridgePrompt(player: Player, baseIndex: number)
 	end
 	local rarity = describe(petId, mutation)
 	remove(entry)
-	Remotes.Notify:FireClient(player, string.format(Strings.PopStored, rarity.Name .. " попс"))
+	Remotes.Notify:FireClient(player, string.format(Strings.PopStored, string.format(Strings.PopOfRarity, rarity.Name)))
 	Remotes.ProfileChanged:FireClient(player)
 end
 
@@ -530,6 +531,9 @@ local function tick(dt: number)
 				and player:GetAttribute("Zone") == "Field"
 				and entry.Model:GetAttribute("Mutation") ~= "Neon" -- неоновый попс без замедления
 			local speed = Balance.Player.BaseSpeed * (if slow then Pop.CarrySpeedMult else 1)
+			if player:GetAttribute("Pass_SpeedPotion") then
+				speed *= Balance.Monetization.SpeedPotionMult
+			end
 			if humanoid.WalkSpeed ~= speed then
 				humanoid.WalkSpeed = speed
 			end

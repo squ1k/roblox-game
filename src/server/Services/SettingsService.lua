@@ -1,5 +1,6 @@
 -- Настройки игрока (data.Settings). Ключи и типы берутся из Balance.DefaultSettings,
--- громкость ограничена 0..1, язык пока только RU/EN (EN заглушка).
+-- громкость ограничена 0..1. Язык: "Auto" (по языку Roblox) до первого выбора, потом RU или EN.
+-- Итоговый язык идет клиенту атрибутом игрока "Language" (его читает Localize.client).
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -12,6 +13,14 @@ local DataService = require(script.Parent:WaitForChild("DataService"))
 local LANGUAGES = { RU = true, EN = true }
 
 local SettingsService = {}
+
+local function resolveLanguage(player: Player, value): string
+	if LANGUAGES[value] then
+		return value
+	end
+	local locale = tostring(player.LocaleId or "")
+	return if locale:sub(1, 2) == "ru" then "RU" else "EN"
+end
 
 local function set(player: Player, key, value)
 	local data = DataService.Get(player)
@@ -28,6 +37,9 @@ local function set(player: Player, key, value)
 		return
 	end
 	data.Settings[key] = value
+	if key == "Language" then
+		player:SetAttribute("Language", value)
+	end
 	Remotes.ProfileChanged:FireClient(player)
 end
 
@@ -42,6 +54,9 @@ end
 
 function SettingsService.Start()
 	Remotes.SettingsSet.OnServerEvent:Connect(set)
+	DataService.ProfileLoaded:Connect(function(player, data)
+		player:SetAttribute("Language", resolveLanguage(player, data.Settings.Language))
+	end)
 end
 
 return SettingsService
