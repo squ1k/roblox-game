@@ -13,6 +13,7 @@ local Remotes = require(Shared:WaitForChild("Remotes"))
 
 local Theme = require(script.Parent:WaitForChild("Theme"))
 local Widgets = require(script.Parent:WaitForChild("Widgets"))
+local Audio = require(script.Parent.Parent:WaitForChild("Audio"))
 local Screen = require(script.Parent:WaitForChild("Screen"))
 local ClientState = require(script.Parent.Parent:WaitForChild("ClientState"))
 local create = Widgets.Create
@@ -296,6 +297,7 @@ return function(parent: Instance, notify)
 		end
 		lockedUntil = os.clock() + RUN_LOCK_SECONDS
 		local ok, message
+		Audio.Play("MergeRun")
 		if mode == "Risk" then
 			ok, message = Remotes.MergeRun:InvokeServer("risk", selected)
 		else

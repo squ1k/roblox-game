@@ -19,6 +19,7 @@ local EconomyService = require(script.Parent:WaitForChild("EconomyService"))
 local MapService = require(script.Parent:WaitForChild("MapService"))
 local PetDisplayService = require(script.Parent:WaitForChild("PetDisplayService"))
 local TradeService = require(script.Parent:WaitForChild("TradeService"))
+local AudioService = require(script.Parent:WaitForChild("AudioService"))
 
 local Objects = Balance.BaseObjects
 local Pedestals = Balance.Pedestals
@@ -90,6 +91,7 @@ function PedestalService.Equip(player: Player, uid, slot)
 		return
 	end
 	data.Pedestals[slot].Pet = uid
+	AudioService.Play(player, "PedestalEquip")
 	changed(player)
 end
 
@@ -98,6 +100,7 @@ function PedestalService.Unequip(player: Player, slot)
 	local pedestal = data and type(slot) == "number" and data.Pedestals[slot]
 	if pedestal and pedestal.Pet then
 		pedestal.Pet = false
+		AudioService.Play(player, "PedestalUnequip")
 		changed(player)
 	end
 end

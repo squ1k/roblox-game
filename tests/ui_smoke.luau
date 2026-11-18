@@ -88,6 +88,7 @@ for _, n in
 	{
 		"DropPop",
 		"UseHotbar",
+		"PlaySound",
 		"ProfileChanged",
 		"Notify",
 		"DevCommand",
@@ -379,6 +380,24 @@ sig(remotes.Notify, "OnClientEvent"):Fire("Привет")
 check(find("Toasts"):FindFirstChildOfClass("Frame") ~= nil, "toast shown")
 sig(menu.Window:FindFirstChild("Close", true), "Activated"):Fire()
 check(not menu.Visible, "menu closes")
+-- звуки уведомлений: текст сопоставляется с шаблонами Strings (без SoundService звук молчит)
+local Audio = env.require(client.Audio)
+local Strings = env.require(RS.Shared.Config.Strings)
+check(Audio.Enabled() == false, "audio off without SoundService")
+check(Audio.ToastSound(Strings.NoCoins) == "Error", "NoCoins -> Error")
+check(Audio.ToastSound(string.format(Strings.Sold, "1.5K")) == "Sell", "Sold -> Sell")
+local winSfx, winKey = Audio.ToastSound(string.format(Strings.ClawWin, "Epic"))
+check(winSfx == false and winKey == "ClawWin", "ClawWin recognised, plays by rarity")
+check(Audio.ToastSound(string.format(Strings.ClawCooldown, 12)) == "Error", "ClawCooldown with number -> Error")
+check(Audio.ToastSound("something else") == "Toast", "unknown text -> Toast")
+local Sounds = env.require(RS.Shared.Config.Sounds)
+for stringKey, sfx in Sounds.Toasts do
+	check(Strings[stringKey] ~= nil, "Toasts key exists in Strings: " .. stringKey)
+	check(sfx == false or Sounds.Sfx[sfx] ~= nil, "Toasts sound exists: " .. tostring(sfx))
+end
+for _, sfx in Sounds.Screens do
+	check(Sounds.Sfx[sfx] ~= nil, "screen sound exists: " .. sfx)
+end
 print("ui scale", hud.UIScale.Scale)
 print(if failures == 0 then "ALL PASSED" else failures .. " FAILED")
 process.exit(failures)

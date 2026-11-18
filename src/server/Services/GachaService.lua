@@ -17,6 +17,7 @@ local Remotes = require(Shared:WaitForChild("Remotes"))
 local DataService = require(script.Parent:WaitForChild("DataService"))
 local EconomyService = require(script.Parent:WaitForChild("EconomyService"))
 local CakePopService = require(script.Parent:WaitForChild("CakePopService"))
+local AudioService = require(script.Parent:WaitForChild("AudioService"))
 
 local Claw = Balance.Claw
 local Gacha = Balance.Gacha
@@ -206,6 +207,7 @@ function GachaService.Restock()
 			task.wait(0.05)
 		end
 	end)
+	AudioService.PlayAt("Restock", bedCenter)
 	workspace:SetAttribute("GachaRestockAt", workspace:GetServerTimeNow() + Gacha.RestockSeconds)
 	restockedEvent:Fire()
 end
@@ -449,6 +451,7 @@ end
 -- onArrive вызывается в лотке: там капсула исчезает, а CakePopService кладет на ее место попс.
 local function dropIntoShaft(capsule: Model, hole, onArrive: () -> ())
 	capsule:SetAttribute("Collected", true)
+	AudioService.PlayAt("CapsuleChute", capsule:GetPivot().Position)
 	for _, part in capsule:GetDescendants() do
 		if part:IsA("BasePart") then
 			part.Anchored = true

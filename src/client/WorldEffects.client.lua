@@ -1,6 +1,6 @@
 -- Эффекты мира на клиенте: Патроны парят и вращаются, над своими занятыми пьедесталами раз в
 -- IncomePopupSeconds всплывает "+N/сек" этого Скебобса (если включено в настройках), над своим
--- персонажем на АФК-лежаке плывут "Zzz". Громкость групп звуков берется из настроек.
+-- персонажем на АФК-лежаке плывут "Zzz". Звуки и громкость групп в SoundController.client.lua.
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -12,6 +12,7 @@ local Balance = require(Shared:WaitForChild("Config"):WaitForChild("Balance"))
 local Strings = require(Shared:WaitForChild("Config"):WaitForChild("Strings"))
 
 local ClientState = require(script.Parent:WaitForChild("ClientState"))
+local Audio = require(script.Parent:WaitForChild("Audio"))
 
 local Effects = Balance.WorldEffects
 local player = Players.LocalPlayer
@@ -79,6 +80,7 @@ task.spawn(function()
 					-- табличка "+2.5/s" (или переведенная "+2.5/сек") -> всплывает "+2.5"
 					local shown = income.Text:match("^%+[^/]+") or income.Text
 					floatText(cube, shown, Color3.fromRGB(255, 210, 60), Vector3.new(0, cube.Size.Y / 2 + 3, 0))
+					Audio.PlayAt("IncomeTick", cube)
 				end
 			end
 		end
@@ -95,25 +97,3 @@ task.spawn(function()
 		end
 	end
 end)
-
--- Громкость по настройкам: все будущие звуки игры кладем в эти группы (SoundService)
-local SoundService = game:GetService("SoundService")
-local function group(name: string): SoundGroup
-	local existing = SoundService:FindFirstChild(name)
-	if existing then
-		return existing
-	end
-	local created = Instance.new("SoundGroup")
-	created.Name = name
-	created.Parent = SoundService
-	return created
-end
-local musicGroup = group("Music")
-local soundsGroup = group("Sounds")
-local function applyVolume()
-	local settings = ClientState.Profile and ClientState.Profile.Settings
-	musicGroup.Volume = settings and settings.Music or Balance.DefaultSettings.Music
-	soundsGroup.Volume = settings and settings.Sounds or Balance.DefaultSettings.Sounds
-end
-ClientState.ProfileChanged:Connect(applyVolume)
-applyVolume()

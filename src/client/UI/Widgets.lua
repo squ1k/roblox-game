@@ -3,11 +3,12 @@
 local TweenService = game:GetService("TweenService")
 
 local Theme = require(script.Parent:WaitForChild("Theme"))
+local Audio = require(script.Parent.Parent:WaitForChild("Audio"))
 
 local Widgets = {}
 
 -- Ключи props, которые не являются свойствами Instance
-local CUSTOM_PROPS = { Parent = true, Outline = true, MaxTextSize = true, CornerRadius = true }
+local CUSTOM_PROPS = { Parent = true, Outline = true, MaxTextSize = true, CornerRadius = true, Sfx = true }
 
 function Widgets.Create(className: string, props, children)
 	local instance = Instance.new(className)
@@ -70,6 +71,7 @@ function Widgets.Label(props)
 end
 
 -- Кнопка с "пружинкой" при нажатии. onClick вызывается на отпускание.
+-- props.Sfx: звук нажатия из Config/Sounds (по умолчанию UiTap, "" = без звука).
 function Widgets.Button(props, onClick)
 	local button = create("TextButton", {
 		AutoButtonColor = false,
@@ -109,6 +111,12 @@ function Widgets.Button(props, onClick)
 	button.MouseLeave:Connect(function()
 		TweenService:Create(scale, releaseInfo, { Scale = 1 }):Play()
 	end)
+	local sfx = if props.Sfx == nil then "UiTap" else props.Sfx
+	if sfx ~= "" then
+		button.Activated:Connect(function()
+			Audio.Play(sfx)
+		end)
+	end
 	if onClick then
 		button.Activated:Connect(onClick)
 	end

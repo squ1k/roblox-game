@@ -4,6 +4,7 @@
 local Services = script.Parent:WaitForChild("Services")
 
 local order = {
+	"AudioService",
 	"MapService",
 	"EconomyService",
 	"PlayerStateService",

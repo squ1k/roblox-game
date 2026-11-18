@@ -22,6 +22,7 @@ local DataService = require(script.Parent:WaitForChild("DataService"))
 local EconomyService = require(script.Parent:WaitForChild("EconomyService"))
 local MapService = require(script.Parent:WaitForChild("MapService"))
 local CakePopService = require(script.Parent:WaitForChild("CakePopService"))
+local AudioService = require(script.Parent:WaitForChild("AudioService"))
 
 local Oven = Balance.Oven
 local Objects = Balance.BaseObjects
@@ -197,6 +198,7 @@ function OvenService.Cancel(player: Player, slot)
 	end
 	table.remove(data.Ovens, slot)
 	table.insert(data.Fridge, entry.Pop)
+	AudioService.Play(player, "OvenCancel")
 	changed(player)
 end
 
