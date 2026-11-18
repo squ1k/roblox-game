@@ -17,6 +17,7 @@ local Income = require(Shared:WaitForChild("Income"))
 local DataService = require(script.Parent:WaitForChild("DataService"))
 local EconomyService = require(script.Parent:WaitForChild("EconomyService"))
 local MapService = require(script.Parent:WaitForChild("MapService"))
+local AudioService = require(script.Parent:WaitForChild("AudioService"))
 
 local Patrons = Balance.Patrons
 
@@ -50,6 +51,12 @@ function PatronService.Summon(player: Player, familyId)
 		return
 	end
 	data.Patrons.Summoned[familyId] = true
+	-- Патрон материализуется над базой: слышно почти со всего острова
+	local base = MapService.GetBase(player:GetAttribute("BaseIndex") or 0)
+	AudioService.PlayAt("PatronSummon", if base then base.Origin + Vector3.new(0, 20, 0) else nil)
+	if not base then
+		AudioService.Play(player, "PatronSummon")
+	end
 	Remotes.Notify:FireClient(player, string.format(Strings.PatronSummoned, Families.ById[familyId].Name))
 	changed(player)
 end

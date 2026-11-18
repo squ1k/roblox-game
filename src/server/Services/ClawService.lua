@@ -23,6 +23,7 @@ local Tug = require(Shared:WaitForChild("Tug"))
 local GachaService = require(script.Parent:WaitForChild("GachaService"))
 local PlayerStateService = require(script.Parent:WaitForChild("PlayerStateService"))
 local DataService = require(script.Parent:WaitForChild("DataService"))
+local AudioService = require(script.Parent:WaitForChild("AudioService"))
 
 local Claw = Balance.Claw
 local Gacha = Balance.Gacha
@@ -60,8 +61,12 @@ local function holeUV(claw): (number, number)
 	return uvOf(GachaService.HoleCenter(claw.Station))
 end
 
+-- В этих фазах клешня едет: на ладони играет мотор (громкость от скорости считает клиент)
+local MOTOR_PHASES = { Aiming = true, Lowering = true, Raising = true, ToHole = true }
+
 local function setPhase(claw, phase: string)
 	claw.State = phase
+	AudioService.SetLoop(claw.Palm, if MOTOR_PHASES[phase] then "ClawMotor" else nil)
 	if claw.Session and claw.Session.Player then
 		claw.Session.Player:SetAttribute("ClawPhase", phase)
 	end
@@ -379,6 +384,7 @@ local function endSession(claw)
 	end
 	claw.Session = nil
 	claw.State = "Idle"
+	AudioService.SetLoop(claw.Palm, nil)
 	claw.AwardUntil = os.clock() + Claw.AwardWindowSeconds
 	if claw.Prompt then
 		claw.Prompt.Enabled = true
@@ -544,6 +550,10 @@ local function step(claw, dt: number)
 		local stalled = claw.StallSince and os.clock() - claw.StallSince > Claw.StallSeconds
 		if y <= claw.MinY and lag < 0.3 or stalled then
 			claw.Target = Vector3.new(target.X, palmPosition.Y, target.Z)
+			if stalled then
+				AudioService.PlayAt("ClawBump", claw.Palm)
+			end
+			AudioService.PlayAt("ClawClose", claw.Palm)
 			setFingersOpen(claw, false)
 			session.CloseAt = os.clock() + Claw.CloseSeconds
 			setPhase(claw, "Closing")
@@ -561,6 +571,7 @@ local function step(claw, dt: number)
 		claw.Target = Vector3.new(target.X, math.min(claw.TopY, target.Y + Claw.RaiseSpeed * dt), target.Z)
 		local grabbed = claw.Grabbed
 		if grabbed and grabbed.SlipAt and palmPosition.Y >= grabbed.SlipAt then
+			AudioService.PlayAt("CapsuleSlip", claw.Palm)
 			setFingersOpen(claw, true)
 			release(claw)
 		end
@@ -591,6 +602,7 @@ local function step(claw, dt: number)
 		local stuck = session.NearHoleSince and os.clock() - session.NearHoleSince > Claw.ArriveTimeout
 		if distance <= move and miss < 0.4 or stuck then
 			setFingersOpen(claw, true)
+			AudioService.PlayAt("ClawOpen", claw.Palm)
 			local hadCapsule = claw.Grabbed ~= nil
 			release(claw)
 			session.ReleaseAt = os.clock() + Claw.ReleaseSeconds

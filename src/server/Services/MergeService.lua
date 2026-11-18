@@ -16,6 +16,7 @@ local MapService = require(script.Parent:WaitForChild("MapService"))
 local CakePopService = require(script.Parent:WaitForChild("CakePopService"))
 local PedestalService = require(script.Parent:WaitForChild("PedestalService"))
 local TradeService = require(script.Parent:WaitForChild("TradeService"))
+local AudioService = require(script.Parent:WaitForChild("AudioService"))
 
 local Merge = Balance.Merge
 local Objects = Balance.BaseObjects
@@ -69,6 +70,7 @@ local function spawnResult(player: Player, altar: BasePart, member, rarity)
 		altar.Position + Vector3.new(0, altar.Size.Y / 2 + 2, 0),
 		Merge.PopLifetimeSeconds
 	)
+	AudioService.PlayAt("MergeAppear", altar.Position + Vector3.new(0, altar.Size.Y / 2 + 2, 0))
 	Remotes.Notify:FireClient(player, string.format(Strings.MergeSuccess, rarity.Name))
 end
 

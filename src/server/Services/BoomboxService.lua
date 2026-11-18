@@ -12,6 +12,7 @@ local Remotes = require(Shared:WaitForChild("Remotes"))
 
 local DataService = require(script.Parent:WaitForChild("DataService"))
 local MapService = require(script.Parent:WaitForChild("MapService"))
+local AudioService = require(script.Parent:WaitForChild("AudioService"))
 
 local MAX_AUDIO_ID = 1e15
 
@@ -43,6 +44,7 @@ local function apply(player: Player)
 	sound.RollOffMinDistance = 10
 	sound.RollOffMaxDistance = Balance.Monetization.BoomboxRange
 	sound.Parent = anchor
+	AudioService.Tag(sound, "Boombox") -- клиенты пускают его через группу "Музыка"
 	sound:Play()
 	sounds[player] = sound
 end

@@ -15,6 +15,7 @@ local DataService = require(script.Parent:WaitForChild("DataService"))
 local PlayerStateService = require(script.Parent:WaitForChild("PlayerStateService"))
 local CakePopService = require(script.Parent:WaitForChild("CakePopService"))
 local GachaService = require(script.Parent:WaitForChild("GachaService"))
+local AudioService = require(script.Parent:WaitForChild("AudioService"))
 
 local Trap = Balance.BananaTrap
 local ITEM_ID = "BananaTrap"
@@ -96,6 +97,7 @@ function TrapService.Stun(player: Player, fromDirection: Vector3?)
 		return
 	end
 	player:SetAttribute("Stunned", true)
+	AudioService.PlayAt("TrapSlip", root.Position)
 	CakePopService.Drop(player, false)
 	humanoid.PlatformStand = true
 	local back = if fromDirection then fromDirection else -root.CFrame.LookVector
@@ -147,6 +149,7 @@ local function place(player: Player, data)
 		Position = position,
 		ExpiresAt = os.clock() + Trap.LifetimeSeconds,
 	}
+	AudioService.PlayAt("TrapPlace", position)
 	Remotes.Notify:FireClient(player, Strings.TrapPlaced)
 	Remotes.ProfileChanged:FireClient(player)
 end

@@ -37,6 +37,7 @@ local EVENTS = {
 	"PetHatched", -- сервер -> клиент: (petId, mutationId?, patronReadyFamilyId?) экран вылупления
 	"AchievementClaim", -- клиент -> сервер: (id) забрать награду за выполненное достижение
 	"SettingsSet", -- клиент -> сервер: (key, value) сохранить настройку из Balance.DefaultSettings
+	"PlaySound", -- сервер -> клиент: (key, where?) звук из Config/Sounds, where = Vector3 | Instance для 3D
 }
 
 local FUNCTIONS = {

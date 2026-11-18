@@ -17,6 +17,7 @@ local Capacity = require(Shared:WaitForChild("Capacity"))
 local DataService = require(script.Parent:WaitForChild("DataService"))
 local MapService = require(script.Parent:WaitForChild("MapService"))
 local PlayerStateService = require(script.Parent:WaitForChild("PlayerStateService"))
+local AudioService = require(script.Parent:WaitForChild("AudioService"))
 
 local Pop = Balance.CakePop
 local MapConfig = Balance.Map
@@ -258,6 +259,7 @@ local function attach(player: Player, entry): boolean
 	carried[player] = entry
 	PlayerStateService.SetCarrying(player, true)
 	syncFridgePrompt(player)
+	AudioService.PlayAt("PopPickup", hand)
 	return true
 end
 
@@ -297,6 +299,7 @@ end
 function CakePopService.SpawnInTray(owner: Player, pop, stationName: string?)
 	local entry = register(owner, pop, stationName)
 	placeAt(entry, CakePopService.TrayPosition(entry.Station))
+	AudioService.PlayAt("IceCrack", entry.Ball.Position)
 	return entry.Model
 end
 
@@ -397,6 +400,7 @@ function CakePopService.Drop(player: Player, throw: boolean?)
 		local velocity = if throw then hrp.CFrame.LookVector * Pop.ThrowSpeed + Vector3.new(0, 6, 0) else Vector3.zero
 		entry.Ball.AssemblyLinearVelocity = velocity
 	end
+	AudioService.PlayAt(if throw then "PopDrop" else "PopLost", entry.Ball.Position)
 	giveToServer(entry.Ball)
 	-- Токсичный попс прилипает к земле: ToxicStickSeconds его не может поднять никто
 	if entry.Model:GetAttribute("Mutation") == "Toxic" then
@@ -437,6 +441,10 @@ local function onFridgePrompt(player: Player, baseIndex: number)
 		data.Stats.Steals += 1
 	end
 	local rarity = describe(petId, mutation)
+	local hrp = root(player)
+	if hrp then
+		AudioService.PlayAt("FridgeStore", hrp.Position)
+	end
 	remove(entry)
 	Remotes.Notify:FireClient(player, string.format(Strings.PopStored, string.format(Strings.PopOfRarity, rarity.Name)))
 	Remotes.ProfileChanged:FireClient(player)
@@ -497,6 +505,7 @@ local function tick(dt: number)
 			if owner then
 				Remotes.Notify:FireClient(owner, Strings.PopMelted)
 			end
+			AudioService.PlayAt("PopMelt", entry.Ball.Position)
 			remove(entry)
 			continue
 		end

@@ -4,6 +4,7 @@ local TweenService = game:GetService("TweenService")
 
 local Theme = require(script.Parent:WaitForChild("Theme"))
 local Widgets = require(script.Parent:WaitForChild("Widgets"))
+local Audio = require(script.Parent.Parent:WaitForChild("Audio"))
 local create = Widgets.Create
 
 return function(parent: Instance)
@@ -25,6 +26,7 @@ return function(parent: Instance)
 	local counter = 0
 
 	return function(text: string)
+		Audio.OnToast(text)
 		counter += 1
 		local toast = create("Frame", {
 			LayoutOrder = counter,

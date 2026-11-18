@@ -16,6 +16,7 @@ local Remotes = require(Shared:WaitForChild("Remotes"))
 local UI = script.Parent:WaitForChild("UI")
 local Theme = require(UI:WaitForChild("Theme"))
 local Widgets = require(UI:WaitForChild("Widgets"))
+local Audio = require(script.Parent:WaitForChild("Audio"))
 local create = Widgets.Create
 
 local Claw = Balance.Claw
@@ -54,6 +55,7 @@ local hintLabel = Widgets.Label({
 local grabButton = Widgets.Button({
 	Name = "Grab",
 	Text = Strings.ClawGrab,
+	Sfx = "", -- звук "Хватать" играет SoundController по фазе клешни (кнопка, пробел и прыжок)
 	BackgroundColor3 = Theme.Colors.Drop,
 	AnchorPoint = Vector2.new(1, 1),
 	Position = UDim2.new(1, -30, 1, -40),
@@ -116,10 +118,14 @@ local tugTimer = Widgets.Label({
 })
 local function tugClick()
 	Remotes.TugClick:FireServer()
+	-- питч растет, когда твоя сторона перевешивает
+	local lead = (player:GetAttribute("TugMine") or 0) - (player:GetAttribute("TugTheirs") or 0)
+	Audio.Play("TugClick", { Pitch = 1 + math.clamp(lead / 20, -0.15, 0.25) })
 end
 Widgets.Button({
 	Name = "Tap",
 	Text = Strings.TugTap,
+	Sfx = "", -- TugClick играет tugClick (и для кнопки, и для клавиш)
 	BackgroundColor3 = Theme.Colors.Coin,
 	AnchorPoint = Vector2.new(0.5, 0.5),
 	Position = UDim2.fromScale(0.5, 0.62),
